@@ -1,0 +1,104 @@
+{% extends "base.html" %}
+{% block title %}{{ currency_code }} — История курса{% endblock %}
+{% block head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+  .hist-header { margin-bottom: 2rem; }
+  .hist-header h1 { font-family: var(--font-head); font-size: 2rem; font-weight: 800; margin-bottom: 4px; }
+  .hist-header p  { color: var(--muted); }
+  .back-link { color: var(--accent); text-decoration: none; font-size: 0.875rem; display: inline-flex; align-items: center; gap: 4px; margin-bottom: 1.5rem; }
+  .back-link:hover { text-decoration: underline; }
+  .chart-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 1.5rem; margin-bottom: 1.5rem; }
+  .chart-card h2 { font-family: var(--font-head); font-size: 1rem; font-weight: 700; margin-bottom: 1.25rem; }
+  .stats-mini { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+  .sm-card { background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; padding: 1rem 1.25rem; }
+  .sm-label { font-size: 0.78rem; color: var(--muted); margin-bottom: 4px; }
+  .sm-value { font-family: var(--font-head); font-size: 1.3rem; font-weight: 700; }
+</style>
+{% endblock %}
+{% block content %}
+<div class="page">
+  <a href="{{ url_for('index') }}" class="back-link fade-up">← Назад к курсам</a>
+
+  <div class="hist-header fade-up d1">
+    <h1>{{ currency_code }} / USD</h1>
+    <p>{{ currency_name }} — динамика курса за 6 месяцев</p>
+  </div>
+
+  <div class="stats-mini fade-up d2" id="statsMini">
+    <div class="sm-card"><div class="sm-label">Текущий курс</div><div class="sm-value" id="statCurrent">—</div></div>
+    <div class="sm-card"><div class="sm-label">Максимум</div><div class="sm-value" id="statMax" style="color:var(--green)">—</div></div>
+    <div class="sm-card"><div class="sm-label">Минимум</div><div class="sm-value" id="statMin" style="color:var(--red)">—</div></div>
+  </div>
+
+  <div class="chart-card fade-up d3" style="margin-top:1.5rem;">
+    <h2>📈 График курса ({{ currency_code }}/USD)</h2>
+    <div style="position:relative;height:300px;">
+      <canvas id="mainChart"></canvas>
+  </div>
+</div>
+
+<script>
+async function loadHistory() {
+  const code = '{{ currency_code }}';
+  try {
+    const r = await fetch(`/api/history/${code}`);
+    const data = await r.json();
+    if (data.error) throw new Error(data.error);
+
+    const rates = data.rates;
+    const max = Math.max(...rates), min = Math.min(...rates);
+    document.getElementById('statCurrent').textContent = rates[rates.length-1].toFixed(4);
+    document.getElementById('statMax').textContent     = max.toFixed(4);
+    document.getElementById('statMin').textContent     = min.toFixed(4);
+
+    const ctx = document.getElementById('mainChart').getContext('2d');
+    const grad = ctx.createLinearGradient(0, 0, 0, 300);
+    grad.addColorStop(0, 'rgba(79,142,247,0.25)');
+    grad.addColorStop(1, 'rgba(79,142,247,0)');
+
+    new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: data.labels,
+        datasets: [{
+          label: `${code}/USD`,
+          data: rates,
+          borderColor: '#4f8ef7',
+          backgroundColor: grad,
+          borderWidth: 2.5, tension: 0.4, fill: true,
+          pointRadius: 5, pointBackgroundColor: '#4f8ef7',
+          pointHoverRadius: 7, pointHoverBackgroundColor: '#fff',
+        }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        interaction: { mode: 'index', intersect: false },
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            backgroundColor: '#1a2035', titleColor: '#dce4f5',
+            bodyColor: '#4f8ef7', borderColor: 'rgba(79,142,247,0.3)',
+            borderWidth: 1, padding: 12,
+          }
+        },
+        scales: {
+          x: {
+            grid: { color: 'rgba(255,255,255,0.04)' },
+            ticks: { color: '#5a6585' }
+          },
+          y: {
+            grid: { color: 'rgba(255,255,255,0.04)' },
+            ticks: { color: '#5a6585' }
+          }
+        }
+      }
+    });
+  } catch(e) {
+    document.getElementById('mainChart').closest('.chart-card').innerHTML =
+      `<div style="padding:2rem;text-align:center;color:var(--muted)">⚠ ${e.message}</div>`;
+  }
+}
+loadHistory();
+</script>
+{% endblock %}

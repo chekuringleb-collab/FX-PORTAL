@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+{% block title %}Админ-панель — FX Portal{% endblock %}
+{% block head %}
+<style>
+  .admin-header { margin-bottom: 2rem; }
+  .admin-header h1 { font-family: var(--font-head); font-size: 1.8rem; font-weight: 800; margin-bottom: 4px; }
+  .admin-header p  { color: var(--muted); font-size: 0.88rem; }
+  .admin-stats { display: grid; grid-template-columns: repeat(3,1fr); gap: 12px; margin-bottom: 2rem; }
+  .admin-stat { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 1.1rem 1.25rem; }
+  .admin-stat .label { font-size: 0.78rem; color: var(--muted); margin-bottom: 4px; }
+  .admin-stat .val   { font-family: var(--font-head); font-size: 1.5rem; font-weight: 700; }
+  .users-wrap { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+  .users-wrap-header { display: flex; align-items: center; justify-content: space-between; padding: 1.1rem 1.3rem; border-bottom: 1px solid var(--border); }
+  .users-wrap-header h2 { font-family: var(--font-head); font-size: 1rem; font-weight: 700; }
+  .users-table { width: 100%; border-collapse: collapse; }
+  .users-table th { padding: 10px 1.3rem; text-align: left; font-size: 0.75rem; font-weight: 600; color: var(--muted); letter-spacing: 0.5px; text-transform: uppercase; border-bottom: 1px solid var(--border); background: rgba(0,0,0,0.2); }
+  .users-table td { padding: 12px 1.3rem; border-bottom: 1px solid var(--border); font-size: 0.9rem; }
+  .users-table tr:last-child td { border-bottom: none; }
+  .users-table tr:hover td { background: var(--surface2); }
+  .role-badge {
+    display: inline-block; padding: 2px 9px; border-radius: 5px;
+    font-size: 0.75rem; font-weight: 600;
+  }
+  .role-admin { background: rgba(79,142,247,0.18); color: var(--accent); }
+  .role-user  { background: rgba(90,101,133,0.25); color: var(--muted); }
+  .you-badge  { font-size: 0.72rem; background: rgba(52,211,153,0.15); color: var(--green); padding: 2px 7px; border-radius: 5px; }
+</style>
+{% endblock %}
+{% block content %}
+<div class="page">
+  <div class="admin-header fade-up">
+    <h1>⚙ Админ-панель</h1>
+    <p>Управление пользователями системы</p>
+  </div>
+
+  <div class="admin-stats fade-up d1">
+    <div class="admin-stat">
+      <div class="label">Всего пользователей</div>
+      <div class="val">{{ users|length }}</div>
+    </div>
+    <div class="admin-stat">
+      <div class="label">Администраторов</div>
+      <div class="val">{{ users|selectattr('role','equalto','admin')|list|length }}</div>
+    </div>
+    <div class="admin-stat">
+      <div class="label">Обычных пользователей</div>
+      <div class="val">{{ users|selectattr('role','equalto','user')|list|length }}</div>
+    </div>
+  </div>
+
+  <div class="users-wrap fade-up d2">
+    <div class="users-wrap-header">
+      <h2>Список пользователей</h2>
+      <span class="text-muted" style="font-size:0.82rem;">{{ users|length }} записей</span>
+    </div>
+    {% if users %}
+    <table class="users-table">
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Логин</th>
+          <th>Роль</th>
+          <th>Дата регистрации</th>
+          <th>Последний вход</th>
+          <th>Действие</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for u in users %}
+        <tr>
+          <td style="color:var(--muted);font-family:monospace;">{{ u.id }}</td>
+          <td>
+            <span style="font-weight:600;">{{ u.username }}</span>
+            {% if u.id == current_user.id %}<span class="you-badge">вы</span>{% endif %}
+          </td>
+          <td><span class="role-badge role-{{ u.role }}">{{ u.role }}</span></td>
+          <td style="color:var(--muted);">{{ u.created_at.strftime('%d.%m.%Y %H:%M') if u.created_at else '—' }}</td>
+          <td style="color:var(--muted);">{{ u.last_login.strftime('%d.%m.%Y %H:%M') if u.last_login else 'никогда' }}</td>
+          <td>
+            {% if u.id != current_user.id %}
+            <form method="POST" action="{{ url_for('delete_user', user_id=u.id) }}" onsubmit="return confirm('Удалить пользователя {{ u.username }}?');">
+              <button type="submit" class="btn btn-danger" style="padding:5px 12px;font-size:0.8rem;">Удалить</button>
+            </form>
+            {% else %}
+            <span style="color:var(--muted);font-size:0.82rem;">—</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div style="padding:2rem;text-align:center;color:var(--muted)">Нет пользователей</div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

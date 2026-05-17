@@ -1,0 +1,329 @@
+{% extends "base.html" %}
+{% block title %}Курсы валют — FX Portal{% endblock %}
+{% block head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+  /* ── Hero ── */
+  .hero {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 2.5rem 0 2rem; gap: 2rem;
+  }
+  .hero-left h1 {
+    font-family: var(--font-head); font-size: 2rem; font-weight: 800;
+    line-height: 1.2; margin-bottom: 0.4rem;
+  }
+  .hero-left p { color: var(--muted); font-size: 0.9rem; }
+  .hero-right { display: flex; gap: 10px; flex-shrink: 0; flex-wrap: wrap; }
+
+  /* ── Stats row ── */
+  .stats-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 2rem; }
+  .stat-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 1.1rem 1.25rem;
+  }
+  .stat-label { font-size: 0.78rem; color: var(--muted); font-weight: 500; margin-bottom: 4px; }
+  .stat-value { font-family: var(--font-head); font-size: 1.5rem; font-weight: 700; }
+  .stat-sub   { font-size: 0.78rem; color: var(--muted); margin-top: 2px; }
+
+  /* ── Main grid ── */
+  .main-grid { display: grid; grid-template-columns: 1fr 320px; gap: 20px; }
+
+  /* ── Rates table ── */
+  .rates-wrap { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+  .rates-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 1.1rem 1.3rem; border-bottom: 1px solid var(--border);
+  }
+  .rates-header h2 { font-family: var(--font-head); font-size: 1rem; font-weight: 700; }
+  .search-input {
+    background: var(--surface2); border: 1px solid var(--border);
+    color: var(--text); border-radius: 8px; padding: 7px 12px;
+    font-size: 0.85rem; font-family: var(--font-body);
+    outline: none; width: 180px; transition: border-color 0.2s;
+  }
+  .search-input:focus { border-color: var(--accent); }
+  .rates-table { width: 100%; border-collapse: collapse; }
+  .rates-table th {
+    padding: 10px 1.3rem; text-align: left;
+    font-size: 0.75rem; font-weight: 600; color: var(--muted);
+    letter-spacing: 0.5px; text-transform: uppercase;
+    border-bottom: 1px solid var(--border); background: rgba(0,0,0,0.2);
+  }
+  .rates-table td { padding: 11px 1.3rem; border-bottom: 1px solid var(--border); }
+  .rates-table tr:last-child td { border-bottom: none; }
+  .rates-table tr:hover td { background: var(--surface2); }
+  .currency-cell { display: flex; align-items: center; gap: 10px; }
+  .currency-flag { font-size: 1.35rem; line-height: 1; }
+  .currency-code { font-family: var(--font-head); font-size: 0.95rem; font-weight: 700; }
+  .currency-name { font-size: 0.78rem; color: var(--muted); margin-top: 1px; }
+  .rate-value    { font-family: var(--font-head); font-weight: 600; font-size: 0.97rem; }
+  .history-link  { color: var(--accent); font-size: 0.8rem; text-decoration: none; opacity: 0.7; }
+  .history-link:hover { opacity: 1; }
+
+  /* ── Converter ── */
+  .converter { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 1.3rem; }
+  .converter h2 { font-family: var(--font-head); font-size: 1rem; font-weight: 700; margin-bottom: 1.2rem; }
+  .conv-form { display: flex; flex-direction: column; gap: 1rem; }
+  .conv-amount input {
+    background: var(--surface2); border: 1px solid var(--border);
+    color: var(--text); border-radius: 10px; padding: 12px 14px;
+    font-size: 1.3rem; font-family: var(--font-head); font-weight: 700;
+    width: 100%; outline: none; transition: border-color 0.2s;
+  }
+  .conv-amount input:focus { border-color: var(--accent); }
+  .conv-selects { display: grid; grid-template-columns: 1fr 32px 1fr; align-items: end; gap: 8px; }
+  .swap-btn {
+    width: 32px; height: 38px; border-radius: 8px; background: var(--surface2);
+    border: 1px solid var(--border); color: var(--muted); cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1rem; transition: all 0.18s; flex-shrink: 0;
+  }
+  .swap-btn:hover { color: var(--accent); border-color: var(--accent); }
+  .conv-result {
+    background: linear-gradient(135deg, rgba(79,142,247,0.08), rgba(167,139,250,0.08));
+    border: 1px solid rgba(79,142,247,0.2);
+    border-radius: 12px; padding: 1.1rem; text-align: center; min-height: 80px;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+  }
+  .conv-result-amount { font-family: var(--font-head); font-size: 1.8rem; font-weight: 800; color: var(--accent); }
+  .conv-result-label  { font-size: 0.8rem; color: var(--muted); margin-top: 3px; }
+
+  /* ── Mini chart inside converter ── */
+  .mini-chart-wrap { margin-top: 1.1rem; }
+  .mini-chart-label { font-size: 0.78rem; color: var(--muted); margin-bottom: 6px; font-weight: 500; }
+
+  /* ── Last updated ── */
+  .last-updated { font-size: 0.78rem; color: var(--muted); }
+
+  @media (max-width: 860px) {
+    .main-grid { grid-template-columns: 1fr; }
+    .stats-row { grid-template-columns: repeat(2, 1fr); }
+    .hero { flex-direction: column; align-items: flex-start; }
+  }
+</style>
+{% endblock %}
+{% block content %}
+<div class="page">
+  <!-- Hero -->
+  <div class="hero fade-up">
+    <div class="hero-left">
+      <h1>Курсы валют<br><span style="color:var(--accent)">в реальном времени</span></h1>
+      <p>Актуальные данные · Конвертер · Экспорт CSV и Excel</p>
+    </div>
+    <div class="hero-right">
+      <a href="{{ url_for('download_csv') }}" class="btn btn-ghost" style="color:var(--green);border-color:rgba(52,211,153,0.3);">↓ CSV</a>
+      <a href="{{ url_for('download_xlsx') }}" class="btn btn-ghost" style="color:var(--green);border-color:rgba(52,211,153,0.3);">↓ Excel</a>
+    </div>
+  </div>
+
+  <!-- Stats -->
+  <div class="stats-row fade-up d1" id="statsRow">
+    <div class="stat-card"><div class="stat-label">Базовая валюта</div><div class="stat-value">USD</div><div class="stat-sub">US Dollar</div></div>
+    <div class="stat-card"><div class="stat-label">Загружено пар</div><div class="stat-value" id="pairsCount">—</div><div class="stat-sub">валютных пар</div></div>
+    <div class="stat-card"><div class="stat-label">Обновлено</div><div class="stat-value" id="updatedDate" style="font-size:1rem;margin-top:4px;">—</div><div class="stat-sub">дата котировки</div></div>
+    <div class="stat-card"><div class="stat-label">EUR/USD</div><div class="stat-value" id="eurRate">—</div><div class="stat-sub">евро за доллар</div></div>
+  </div>
+
+  <!-- Main content -->
+  <div class="main-grid">
+    <!-- Rates table -->
+    <div class="rates-wrap fade-up d2">
+      <div class="rates-header">
+        <h2>Все курсы к USD</h2>
+        <input class="search-input" type="text" id="searchInput" placeholder="Поиск валюты..." />
+      </div>
+      <div id="tableContainer">
+        <div class="spinner"></div>
+      </div>
+    </div>
+
+    <!-- Right column -->
+    <div style="display:flex;flex-direction:column;gap:16px;">
+      <!-- Converter -->
+      <div class="converter fade-up d3">
+        <h2>💱 Конвертер</h2>
+        <div class="conv-form">
+          <div class="conv-amount input-group">
+            <label>Сумма</label>
+            <input type="number" id="convAmount" value="100" min="0" step="any" />
+          </div>
+          <div class="conv-selects">
+            <div class="input-group">
+              <label>Из</label>
+              <select id="convFrom"><option>USD</option></select>
+            </div>
+            <button class="swap-btn" id="swapBtn" title="Поменять">⇄</button>
+            <div class="input-group">
+              <label>В</label>
+              <select id="convTo"><option>EUR</option></select>
+            </div>
+          </div>
+          <div class="conv-result" id="convResult">
+            <div class="conv-result-amount" id="convResultAmount">—</div>
+            <div class="conv-result-label" id="convResultLabel">Введите сумму</div>
+          </div>
+          <div class="mini-chart-wrap">
+            <div class="mini-chart-label" id="miniChartLabel">Тренд за 6 мес.</div>
+            <div style="position:relative;height:80px;">
+              <canvas id="miniChart"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <!-- Top currencies card -->
+      <div class="card fade-up d4">
+        <div style="font-family:var(--font-head);font-size:0.95rem;font-weight:700;margin-bottom:1rem;">⭐ Популярные</div>
+        <div id="topCurrencies" style="display:flex;flex-direction:column;gap:8px;">
+          <div class="spinner" style="width:24px;height:24px;border-width:2px;margin:1rem auto;"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+let ratesData = [];
+let miniChartInstance = null;
+
+async function loadRates() {
+  try {
+    const r = await fetch('/api/rates');
+    const data = await r.json();
+    if (data.error) throw new Error(data.error);
+    ratesData = data.rates;
+    renderTable(ratesData);
+    populateSelects(ratesData);
+    updateStats(data);
+    renderTopCurrencies(ratesData);
+    convert();
+  } catch(e) {
+    document.getElementById('tableContainer').innerHTML =
+      `<div style="padding:2rem;text-align:center;color:var(--muted)">⚠ ${e.message}</div>`;
+  }
+}
+
+function updateStats(data) {
+  document.getElementById('pairsCount').textContent = data.rates.length;
+  document.getElementById('updatedDate').textContent = data.date || '—';
+  const eur = data.rates.find(r => r.code === 'EUR');
+  if (eur) document.getElementById('eurRate').textContent = eur.rate.toFixed(4);
+}
+
+function renderTable(rates) {
+  if (!rates.length) { document.getElementById('tableContainer').innerHTML = '<div style="padding:2rem;text-align:center;color:var(--muted)">Нет данных</div>'; return; }
+  let html = `<table class="rates-table">
+    <thead><tr>
+      <th>Валюта</th><th>Курс к USD</th><th>График</th>
+    </tr></thead><tbody>`;
+  rates.forEach(r => {
+    html += `<tr>
+      <td><div class="currency-cell">
+        <span class="currency-flag">${r.flag}</span>
+        <div><div class="currency-code">${r.code}</div><div class="currency-name">${r.name}</div></div>
+      </div></td>
+      <td><span class="rate-value">${r.rate.toFixed(4)}</span></td>
+      <td><a class="history-link" href="/history/${r.code}">Тренд →</a></td>
+    </tr>`;
+  });
+  html += '</tbody></table>';
+  document.getElementById('tableContainer').innerHTML = html;
+}
+
+function populateSelects(rates) {
+  const TOP = ['USD','EUR','RUB','CNY','GBP','JPY','KZT','TRY','CHF','CAD','AED','AUD','BYN'];
+  const sorted = [...rates].sort((a,b) => {
+    const ai = TOP.indexOf(a.code), bi = TOP.indexOf(b.code);
+    if (ai !== -1 && bi !== -1) return ai - bi;
+    if (ai !== -1) return -1; if (bi !== -1) return 1;
+    return a.code.localeCompare(b.code);
+  });
+  ['convFrom','convTo'].forEach(id => {
+    const sel = document.getElementById(id);
+    sel.innerHTML = sorted.map(r => `<option value="${r.code}">${r.flag} ${r.code} — ${r.name}</option>`).join('');
+  });
+  document.getElementById('convFrom').value = 'USD';
+  document.getElementById('convTo').value   = 'RUB';
+}
+
+function renderTopCurrencies(rates) {
+  const TOP = ['EUR','RUB','CNY','GBP','JPY','KZT'];
+  const el = document.getElementById('topCurrencies');
+  const filtered = TOP.map(c => rates.find(r => r.code === c)).filter(Boolean);
+  el.innerHTML = filtered.map(r => `
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--border);">
+      <div style="display:flex;align-items:center;gap:8px;">
+        <span style="font-size:1.2rem">${r.flag}</span>
+        <div>
+          <div style="font-weight:600;font-size:0.88rem">${r.code}</div>
+          <div style="font-size:0.72rem;color:var(--muted)">${r.name}</div>
+        </div>
+      </div>
+      <div style="font-family:var(--font-head);font-weight:700;font-size:0.93rem">${r.rate.toFixed(4)}</div>
+    </div>`).join('');
+}
+
+function convert() {
+  const amount = parseFloat(document.getElementById('convAmount').value) || 0;
+  const from   = document.getElementById('convFrom').value;
+  const to     = document.getElementById('convTo').value;
+  if (!ratesData.length) return;
+  const fromRate = from === 'USD' ? 1 : ratesData.find(r => r.code === from)?.rate || 1;
+  const toRate   = to   === 'USD' ? 1 : ratesData.find(r => r.code === to)?.rate   || 1;
+  const result   = amount * (toRate / fromRate);
+  document.getElementById('convResultAmount').textContent = result.toFixed(4);
+  document.getElementById('convResultLabel').textContent  = `${amount} ${from} → ${to}`;
+  loadMiniChart(from, to);
+}
+
+async function loadMiniChart(from, to) {
+  document.getElementById('miniChartLabel').textContent = `Тренд ${from}/${to} за 6 мес.`;
+  try {
+    const r = await fetch(`/api/history/${to}`);
+    const data = await r.json();
+    if (data.error) return;
+    if (miniChartInstance) miniChartInstance.destroy();
+    const ctx = document.getElementById('miniChart').getContext('2d');
+    const grad = ctx.createLinearGradient(0, 0, 0, 80);
+    grad.addColorStop(0, 'rgba(79,142,247,0.3)');
+    grad.addColorStop(1, 'rgba(79,142,247,0)');
+    miniChartInstance = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: data.labels,
+        datasets: [{
+          data: data.rates,
+          borderColor: '#4f8ef7', backgroundColor: grad,
+          borderWidth: 2, tension: 0.4, fill: true,
+          pointRadius: 3, pointBackgroundColor: '#4f8ef7',
+        }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false }, tooltip: { mode: 'index', intersect: false } },
+        scales: {
+          x: { grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { color: '#5a6585', font: { size: 9 } } },
+          y: { grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { color: '#5a6585', font: { size: 9 } } }
+        }
+      }
+    });
+  } catch(e) {}
+}
+
+document.getElementById('searchInput').addEventListener('input', function() {
+  const q = this.value.toLowerCase();
+  const filtered = ratesData.filter(r => r.code.toLowerCase().includes(q) || r.name.toLowerCase().includes(q));
+  renderTable(filtered);
+});
+
+['convAmount','convFrom','convTo'].forEach(id => document.getElementById(id).addEventListener('input', convert));
+
+document.getElementById('swapBtn').addEventListener('click', () => {
+  const f = document.getElementById('convFrom'), t = document.getElementById('convTo');
+  [f.value, t.value] = [t.value, f.value];
+  convert();
+});
+
+loadRates();
+setInterval(loadRates, 60000);
+</script>
+{% endblock %}

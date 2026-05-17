@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block title %}Регистрация — FX Portal{% endblock %}
+{% block head %}
+<style>
+  body { display: flex; flex-direction: column; }
+  .auth-wrap {
+    flex: 1; display: flex; align-items: center; justify-content: center;
+    min-height: 100vh; padding: 2rem;
+    background: radial-gradient(ellipse 80% 60% at 50% -10%, rgba(167,139,250,0.1) 0%, transparent 70%);
+  }
+  .auth-box {
+    width: 100%; max-width: 420px;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 20px; padding: 2.5rem;
+    animation: fadeUp 0.5s ease both;
+  }
+  .auth-title { font-family: var(--font-head); font-size: 1.5rem; font-weight: 800; text-align: center; margin-bottom: 0.3rem; }
+  .auth-sub   { text-align: center; color: var(--muted); font-size: 0.85rem; margin-bottom: 2rem; }
+  .auth-form  { display: flex; flex-direction: column; gap: 1.1rem; }
+  .auth-form .input-group input { background: var(--surface2); }
+  .hint { font-size: 0.78rem; color: var(--muted); margin-top: 2px; }
+  .auth-divider { text-align: center; margin-top: 1.25rem; font-size: 0.85rem; color: var(--muted); }
+  .auth-divider a { color: var(--accent); text-decoration: none; }
+  .auth-divider a:hover { text-decoration: underline; }
+</style>
+{% endblock %}
+{% block content %}
+<div class="auth-wrap">
+  <div class="auth-box">
+    <h1 class="auth-title">Создать аккаунт</h1>
+    <p class="auth-sub">Первый зарегистрированный получает права администратора</p>
+    <form class="auth-form" method="POST" action="{{ url_for('register') }}">
+      <div class="input-group">
+        <label for="username">Логин</label>
+        <input type="text" id="username" name="username" placeholder="от 3 до 32 символов" autocomplete="username" required />
+        <span class="hint">Буквы, цифры, _ и -</span>
+      </div>
+      <div class="input-group">
+        <label for="password">Пароль</label>
+        <input type="password" id="password" name="password" placeholder="минимум 8 символов" autocomplete="new-password" required />
+      </div>
+      <div class="input-group">
+        <label for="confirm_password">Подтверждение пароля</label>
+        <input type="password" id="confirm_password" name="confirm_password" placeholder="повторите пароль" autocomplete="new-password" required />
+      </div>
+      <button type="submit" class="btn btn-primary" style="width:100%;justify-content:center;padding:12px;margin-top:4px;">
+        Зарегистрироваться →
+      </button>
+    </form>
+    <div class="auth-divider">
+      Уже есть аккаунт? <a href="{{ url_for('login') }}">Войти</a>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{% block title %}FX Portal{% endblock %}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #080b12; --surface: #0f1422; --surface2: #161d30;
+      --border: rgba(255,255,255,0.07); --accent: #4f8ef7;
+      --accent2: #a78bfa; --gold: #f0c040; --green: #34d399;
+      --red: #f87171; --text: #dce4f5; --muted: #5a6585;
+      --radius: 14px; --font-head: 'Syne', sans-serif; --font-body: 'DM Sans', sans-serif;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: var(--bg); color: var(--text); font-family: var(--font-body); min-height: 100vh; line-height: 1.6; }
+    .navbar {
+      position: sticky; top: 0; z-index: 100;
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0 2rem; height: 62px;
+      background: rgba(8,11,18,0.88); backdrop-filter: blur(24px);
+      border-bottom: 1px solid var(--border);
+    }
+    .navbar-brand {
+      font-family: var(--font-head); font-size: 1.2rem; font-weight: 800;
+      color: var(--text); text-decoration: none;
+      display: flex; align-items: center; gap: 10px;
+    }
+    .logo-icon {
+      width: 34px; height: 34px; border-radius: 9px;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      display: flex; align-items: center; justify-content: center;
+      font-size: 16px; font-weight: 700;
+    }
+    .navbar-links { display: flex; align-items: center; gap: 4px; }
+    .nav-link {
+      padding: 6px 14px; border-radius: 8px; color: var(--muted);
+      text-decoration: none; font-size: 0.875rem; font-weight: 500;
+      transition: all 0.18s;
+    }
+    .nav-link:hover, .nav-link.active { color: var(--text); background: var(--surface2); }
+    .nav-user {
+      font-size: 0.82rem; color: var(--muted); padding: 5px 12px;
+      border-radius: 8px; background: var(--surface2); border: 1px solid var(--border);
+      display: flex; align-items: center; gap: 7px;
+    }
+    .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--green); display: inline-block; }
+    .badge-admin { font-size: 0.7rem; background: rgba(79,142,247,0.18); color: var(--accent); padding: 2px 7px; border-radius: 5px; font-weight: 600; }
+    .flashes { max-width: 1000px; margin: 1.25rem auto 0; padding: 0 1.5rem; display: flex; flex-direction: column; gap: 8px; }
+    .flash { padding: 11px 16px; border-radius: var(--radius); font-size: 0.875rem; font-weight: 500; border-left: 3px solid; }
+    .flash.error   { background: rgba(248,113,113,0.09); border-color: var(--red);   color: #fca5a5; }
+    .flash.success { background: rgba(52,211,153,0.09);  border-color: var(--green); color: #6ee7b7; }
+    .flash.info    { background: rgba(79,142,247,0.09);  border-color: var(--accent);color: #93c5fd; }
+    .page { max-width: 1100px; margin: 0 auto; padding: 2.5rem 1.5rem 5rem; }
+    .btn {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 10px 20px; border-radius: 10px;
+      font-family: var(--font-body); font-size: 0.875rem; font-weight: 500;
+      cursor: pointer; border: none; text-decoration: none; transition: all 0.18s; white-space: nowrap;
+    }
+    .btn-primary { background: var(--accent); color: #fff; }
+    .btn-primary:hover { background: #3a78e6; transform: translateY(-1px); box-shadow: 0 6px 22px rgba(79,142,247,0.3); }
+    .btn-ghost  { background: var(--surface2); color: var(--text); border: 1px solid var(--border); }
+    .btn-ghost:hover { background: #1e2740; }
+    .btn-danger { background: rgba(248,113,113,0.12); color: var(--red); border: 1px solid rgba(248,113,113,0.22); }
+    .btn-danger:hover { background: rgba(248,113,113,0.22); }
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 1.5rem; }
+    .input-group { display: flex; flex-direction: column; gap: 6px; }
+    .input-group label { font-size: 0.82rem; font-weight: 500; color: var(--muted); }
+    .input-group input, .input-group select {
+      background: var(--bg); border: 1px solid var(--border);
+      color: var(--text); border-radius: 10px; padding: 11px 14px;
+      font-family: var(--font-body); font-size: 0.93rem; outline: none;
+      transition: border-color 0.2s; width: 100%;
+    }
+    .input-group input:focus, .input-group select:focus { border-color: var(--accent); }
+    .spinner { width: 36px; height: 36px; border-radius: 50%; border: 3px solid var(--border); border-top-color: var(--accent); animation: spin 0.75s linear infinite; margin: 3rem auto; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    @keyframes fadeUp { from { opacity:0; transform:translateY(16px); } to { opacity:1; transform:translateY(0); } }
+    .fade-up   { animation: fadeUp 0.45s ease both; }
+    .d1 { animation-delay: 0.04s; } .d2 { animation-delay: 0.08s; }
+    .d3 { animation-delay: 0.13s; } .d4 { animation-delay: 0.18s; }
+    ::-webkit-scrollbar { width: 5px; } ::-webkit-scrollbar-track { background: var(--bg); } ::-webkit-scrollbar-thumb { background: var(--surface2); border-radius: 3px; }
+    .logout-form { display: inline; }
+    .logout-btn { background: none; border: none; cursor: pointer; padding: 6px 14px; border-radius: 8px; color: var(--muted); font-size: 0.875rem; font-weight: 500; font-family: var(--font-body); transition: all 0.18s; }
+    .logout-btn:hover { color: var(--red); background: rgba(248,113,113,0.1); }
+    select option { background: #1a2035; }
+  </style>
+  {% block head %}{% endblock %}
+</head>
+<body>
+
+{% if current_user.is_authenticated %}
+<nav class="navbar">
+  <a href="{{ url_for('index') }}" class="navbar-brand">
+    <span class="logo-icon">₿</span>FX Portal
+  </a>
+  <div class="navbar-links">
+    <a href="{{ url_for('index') }}" class="nav-link {% if request.endpoint == 'index' %}active{% endif %}" style="color:var(--green)">Курсы</a>
+    {% if current_user.is_admin %}
+    <a href="{{ url_for('admin_panel') }}" class="nav-link {% if request.endpoint == 'admin_panel' %}active{% endif %}" style="color:var(--green)">⚙ Админ</a>
+    {% endif %}
+    <a href="{{ url_for('download_csv') }}" class="nav-link" style="color:var(--green)">↓ CSV</a>
+    <a href="{{ url_for('download_xlsx') }}" class="nav-link" style="color:var(--green)">↓ Excel</a>
+  </div>
+  <div style="display:flex;align-items:center;gap:8px;">
+    <div class="nav-user">
+      <span class="dot"></span>{{ current_user.username }}
+      {% if current_user.is_admin %}<span class="badge-admin">admin</span>{% endif %}
+    </div>
+    <form class="logout-form" action="{{ url_for('logout') }}" method="POST">
+      <button class="logout-btn" type="submit">Выйти</button>
+    </form>
+  </div>
+</nav>
+{% endif %}
+
+{% with messages = get_flashed_messages(with_categories=true) %}
+{% if messages %}
+<div class="flashes">
+  {% for cat, msg in messages %}
+  <div class="flash {{ cat }}">{{ msg }}</div>
+  {% endfor %}
+</div>
+{% endif %}
+{% endwith %}
+
+{% block content %}{% endblock %}
+</body>
+</html>

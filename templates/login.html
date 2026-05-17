@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% block title %}Вход — FX Portal{% endblock %}
+{% block head %}
+<style>
+  body { display: flex; flex-direction: column; }
+  .auth-wrap {
+    flex: 1; display: flex; align-items: center; justify-content: center;
+    min-height: 100vh; padding: 2rem;
+    background: radial-gradient(ellipse 80% 60% at 50% -10%, rgba(79,142,247,0.12) 0%, transparent 70%);
+  }
+  .auth-box {
+    width: 100%; max-width: 420px;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 20px; padding: 2.5rem;
+    animation: fadeUp 0.5s ease both;
+  }
+  .auth-logo {
+    display: flex; align-items: center; gap: 12px;
+    justify-content: center; margin-bottom: 2rem;
+  }
+  .auth-logo-icon {
+    width: 48px; height: 48px; border-radius: 14px;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    display: flex; align-items: center; justify-content: center;
+    font-size: 22px; font-weight: 800; font-family: var(--font-head);
+  }
+  .auth-logo h1 { font-family: var(--font-head); font-size: 1.6rem; font-weight: 800; }
+  .auth-logo p  { font-size: 0.78rem; color: var(--muted); margin-top: 1px; }
+  .auth-form { display: flex; flex-direction: column; gap: 1.1rem; }
+  .auth-form .input-group input { background: var(--surface2); }
+  .auth-divider {
+    text-align: center; margin-top: 1.5rem;
+    font-size: 0.85rem; color: var(--muted);
+  }
+  .auth-divider a { color: var(--accent); text-decoration: none; }
+  .auth-divider a:hover { text-decoration: underline; }
+  .remember-row { display: flex; align-items: center; gap: 8px; font-size: 0.85rem; color: var(--muted); }
+  .remember-row input[type=checkbox] { accent-color: var(--accent); width: 15px; height: 15px; cursor: pointer; }
+</style>
+{% endblock %}
+{% block content %}
+<div class="auth-wrap">
+  <div class="auth-box">
+    <div class="auth-logo">
+      <div class="auth-logo-icon">₿</div>
+      <div>
+        <h1>FX Portal</h1>
+        <p>Валютный монитор 2026</p>
+      </div>
+    </div>
+    <form class="auth-form" method="POST" action="{{ url_for('login') }}">
+      <div class="input-group">
+        <label for="username">Логин</label>
+        <input type="text" id="username" name="username" placeholder="Введите логин" autocomplete="username" required />
+      </div>
+      <div class="input-group">
+        <label for="password">Пароль</label>
+        <input type="password" id="password" name="password" placeholder="Введите пароль" autocomplete="current-password" required />
+      </div>
+      <label class="remember-row">
+        <input type="checkbox" name="remember" value="1" /> Запомнить меня
+      </label>
+      <button type="submit" class="btn btn-primary" style="width:100%;justify-content:center;padding:12px;">
+        Войти →
+      </button>
+    </form>
+    <div class="auth-divider" style="margin-top:1.25rem;">
+      Нет аккаунта? <a href="{{ url_for('register') }}">Зарегистрироваться</a>
+    </div>
+  </div>
+</div>
+{% endblock %}
