@@ -1,8 +1,29 @@
+# Python
 __pycache__/
 *.pyc
 *.pyo
-instance/
-.env
-.venv/
-.idea/
 *.egg-info/
+
+# Виртуальное окружение
+.venv/
+venv/
+
+# База данных (создаётся при запуске)
+instance/
+*.db
+
+# Секреты
+.env
+
+# IDE и OS
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# Git
+.git/
+.gitignore
+
+# Тесты (не нужны в контейнере)
+tests.py

@@ -170,7 +170,7 @@ python tests.py
 ```
 
 ```
-Ran 24 tests in 30s — OK ✅
+Ran 24 tests in 25s — OK ✅
 ```
 
 | Модуль | Тестов | Статус |

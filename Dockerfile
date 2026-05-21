@@ -9,12 +9,13 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Код проекта
 COPY . .
 
-# Создаём папку для БД
+# Папка для SQLite БД
 RUN mkdir -p /app/instance
 
 EXPOSE 5000
 
 ENV FLASK_ENV=production
 ENV PYTHONUNBUFFERED=1
+ENV PYTHONDONTWRITEBYTECODE=1
 
 CMD ["python", "app.py"]
