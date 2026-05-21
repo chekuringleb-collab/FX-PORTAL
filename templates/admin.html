@@ -2,35 +2,45 @@
 {% block title %}Админ-панель — FX Portal{% endblock %}
 {% block head %}
 <style>
-  .admin-header { margin-bottom: 2rem; }
+  .admin-header { margin-bottom: 1.5rem; }
   .admin-header h1 { font-family: var(--font-head); font-size: 1.8rem; font-weight: 800; margin-bottom: 4px; }
   .admin-header p  { color: var(--muted); font-size: 0.88rem; }
-  .admin-stats { display: grid; grid-template-columns: repeat(3,1fr); gap: 12px; margin-bottom: 2rem; }
+  .admin-stats { display: grid; grid-template-columns: repeat(4,1fr); gap: 12px; margin-bottom: 2rem; }
   .admin-stat { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 1.1rem 1.25rem; }
   .admin-stat .label { font-size: 0.78rem; color: var(--muted); margin-bottom: 4px; }
   .admin-stat .val   { font-family: var(--font-head); font-size: 1.5rem; font-weight: 700; }
-  .users-wrap { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+  .users-wrap { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; margin-bottom: 1.5rem; }
   .users-wrap-header { display: flex; align-items: center; justify-content: space-between; padding: 1.1rem 1.3rem; border-bottom: 1px solid var(--border); }
   .users-wrap-header h2 { font-family: var(--font-head); font-size: 1rem; font-weight: 700; }
   .users-table { width: 100%; border-collapse: collapse; }
-  .users-table th { padding: 10px 1.3rem; text-align: left; font-size: 0.75rem; font-weight: 600; color: var(--muted); letter-spacing: 0.5px; text-transform: uppercase; border-bottom: 1px solid var(--border); background: rgba(0,0,0,0.2); }
-  .users-table td { padding: 12px 1.3rem; border-bottom: 1px solid var(--border); font-size: 0.9rem; }
+  .users-table th { padding: 10px 1rem; text-align: left; font-size: 0.75rem; font-weight: 600; color: var(--muted); letter-spacing: 0.5px; text-transform: uppercase; border-bottom: 1px solid var(--border); background: rgba(0,0,0,0.2); }
+  .users-table td { padding: 11px 1rem; border-bottom: 1px solid var(--border); font-size: 0.875rem; }
   .users-table tr:last-child td { border-bottom: none; }
   .users-table tr:hover td { background: var(--surface2); }
-  .role-badge {
-    display: inline-block; padding: 2px 9px; border-radius: 5px;
-    font-size: 0.75rem; font-weight: 600;
-  }
+  .role-badge { display: inline-block; padding: 2px 9px; border-radius: 5px; font-size: 0.75rem; font-weight: 600; }
   .role-admin { background: rgba(79,142,247,0.18); color: var(--accent); }
   .role-user  { background: rgba(90,101,133,0.25); color: var(--muted); }
   .you-badge  { font-size: 0.72rem; background: rgba(52,211,153,0.15); color: var(--green); padding: 2px 7px; border-radius: 5px; }
+  .blocked-badge { font-size: 0.72rem; background: rgba(248,113,113,0.15); color: var(--red); padding: 2px 7px; border-radius: 5px; }
+  .actions-cell { display: flex; gap: 6px; flex-wrap: wrap; }
+  .btn-sm { padding: 4px 10px; font-size: 0.78rem; border-radius: 6px; }
+  .logs-wrap { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+  .logs-wrap-header { display: flex; align-items: center; justify-content: space-between; padding: 1.1rem 1.3rem; border-bottom: 1px solid var(--border); }
+  .logs-wrap-header h2 { font-family: var(--font-head); font-size: 1rem; font-weight: 700; }
+  .log-item { padding: 10px 1.3rem; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 12px; font-size: 0.85rem; }
+  .log-item:last-child { border-bottom: none; }
+  .log-user { font-weight: 600; color: var(--accent); min-width: 100px; }
+  .log-action { color: var(--text); flex: 1; }
+  .log-time { color: var(--muted); font-size: 0.78rem; white-space: nowrap; }
+  .log-ip { color: var(--muted); font-size: 0.75rem; font-family: monospace; }
+  @media(max-width:700px){ .admin-stats{grid-template-columns:repeat(2,1fr);} }
 </style>
 {% endblock %}
 {% block content %}
 <div class="page">
   <div class="admin-header fade-up">
     <h1>⚙ Админ-панель</h1>
-    <p>Управление пользователями системы</p>
+    <p>Управление пользователями и мониторинг системы</p>
   </div>
 
   <div class="admin-stats fade-up d1">
@@ -40,47 +50,64 @@
     </div>
     <div class="admin-stat">
       <div class="label">Администраторов</div>
-      <div class="val">{{ users|selectattr('role','equalto','admin')|list|length }}</div>
+      <div class="val" style="color:var(--accent)">{{ users|selectattr('role','equalto','admin')|list|length }}</div>
     </div>
     <div class="admin-stat">
-      <div class="label">Обычных пользователей</div>
-      <div class="val">{{ users|selectattr('role','equalto','user')|list|length }}</div>
+      <div class="label">Заблокировано</div>
+      <div class="val" style="color:var(--red)">{{ blocked_count }}</div>
+    </div>
+    <div class="admin-stat">
+      <div class="label">Всего входов</div>
+      <div class="val" style="color:var(--green)">{{ total_logins }}</div>
     </div>
   </div>
 
+  <!-- Пользователи -->
   <div class="users-wrap fade-up d2">
     <div class="users-wrap-header">
-      <h2>Список пользователей</h2>
-      <span class="text-muted" style="font-size:0.82rem;">{{ users|length }} записей</span>
+      <h2>👥 Пользователи</h2>
+      <span style="font-size:0.82rem;color:var(--muted)">{{ users|length }} записей</span>
     </div>
     {% if users %}
     <table class="users-table">
       <thead>
         <tr>
-          <th>ID</th>
-          <th>Логин</th>
-          <th>Роль</th>
-          <th>Дата регистрации</th>
-          <th>Последний вход</th>
-          <th>Действие</th>
+          <th>Логин</th><th>Роль</th><th>Статус</th><th>Входов</th><th>Последний вход</th><th>Действия</th>
         </tr>
       </thead>
       <tbody>
         {% for u in users %}
         <tr>
-          <td style="color:var(--muted);font-family:monospace;">{{ u.id }}</td>
           <td>
             <span style="font-weight:600;">{{ u.username }}</span>
             {% if u.id == current_user.id %}<span class="you-badge">вы</span>{% endif %}
+            {% if u.is_blocked %}<span class="blocked-badge">заблокирован</span>{% endif %}
           </td>
           <td><span class="role-badge role-{{ u.role }}">{{ u.role }}</span></td>
-          <td style="color:var(--muted);">{{ u.created_at.strftime('%d.%m.%Y %H:%M') if u.created_at else '—' }}</td>
-          <td style="color:var(--muted);">{{ u.last_login.strftime('%d.%m.%Y %H:%M') if u.last_login else 'никогда' }}</td>
+          <td>
+            <span style="font-size:0.85rem;color:{{ 'var(--red)' if u.is_blocked else 'var(--green)' }}">
+              {{ '🔴 Блок' if u.is_blocked else '🟢 Активен' }}
+            </span>
+          </td>
+          <td style="color:var(--muted);">{{ u.login_count or 0 }}</td>
+          <td style="color:var(--muted);font-size:0.82rem;">{{ u.last_login.strftime('%d.%m.%Y %H:%M') if u.last_login else 'никогда' }}</td>
           <td>
             {% if u.id != current_user.id %}
-            <form method="POST" action="{{ url_for('delete_user', user_id=u.id) }}" onsubmit="return confirm('Удалить пользователя {{ u.username }}?');">
-              <button type="submit" class="btn btn-danger" style="padding:5px 12px;font-size:0.8rem;">Удалить</button>
-            </form>
+            <div class="actions-cell">
+              <form method="POST" action="{{ url_for('toggle_role', uid=u.id) }}" style="display:inline;">
+                <button type="submit" class="btn btn-ghost btn-sm" title="Сменить роль">
+                  {{ '→ user' if u.is_admin else '→ admin' }}
+                </button>
+              </form>
+              <form method="POST" action="{{ url_for('toggle_block', uid=u.id) }}" style="display:inline;">
+                <button type="submit" class="btn btn-sm" style="background:rgba(248,113,113,0.12);color:var(--red);border:1px solid rgba(248,113,113,0.22);">
+                  {{ 'Разблок' if u.is_blocked else 'Блок' }}
+                </button>
+              </form>
+              <form method="POST" action="{{ url_for('delete_user', uid=u.id) }}" style="display:inline;" onsubmit="return confirm('Удалить {{ u.username }}?');">
+                <button type="submit" class="btn btn-danger btn-sm">Удалить</button>
+              </form>
+            </div>
             {% else %}
             <span style="color:var(--muted);font-size:0.82rem;">—</span>
             {% endif %}
@@ -92,6 +119,25 @@
     {% else %}
     <div style="padding:2rem;text-align:center;color:var(--muted)">Нет пользователей</div>
     {% endif %}
+  </div>
+
+  <!-- Логи -->
+  <div class="logs-wrap fade-up d3">
+    <div class="logs-wrap-header">
+      <h2>📋 Последние действия</h2>
+      <a href="{{ url_for('admin_logs') }}" class="btn btn-ghost" style="padding:5px 12px;font-size:0.82rem;">Все логи →</a>
+    </div>
+    {% set recent = namespace(logs=[]) %}
+    {% for u in users %}
+      {% for log in u.logs[-3:] %}
+        <div class="log-item">
+          <span class="log-user">{{ u.username }}</span>
+          <span class="log-action">{{ log.action }}</span>
+          <span class="log-ip">{{ log.ip_address or '—' }}</span>
+          <span class="log-time">{{ log.created_at.strftime('%d.%m %H:%M') }}</span>
+        </div>
+      {% endfor %}
+    {% endfor %}
   </div>
 </div>
 {% endblock %}

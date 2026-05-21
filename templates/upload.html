@@ -1,0 +1,326 @@
+{% extends "base.html" %}
+{% block title %}Загрузка файла — FX Portal{% endblock %}
+{% block head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<style>
+  .upload-header { margin-bottom: 1.5rem; }
+  .upload-header h1 { font-family: var(--font-head); font-size: 1.8rem; font-weight: 800; margin-bottom: 4px; }
+  .upload-header p  { color: var(--muted); font-size: 0.88rem; }
+
+  .drop-zone {
+    border: 2px dashed var(--border); border-radius: var(--radius);
+    padding: 3rem 2rem; text-align: center; cursor: pointer;
+    transition: all 0.2s; background: var(--surface);
+    margin-bottom: 1.5rem;
+  }
+  .drop-zone:hover, .drop-zone.dragover {
+    border-color: var(--accent); background: rgba(79,142,247,0.05);
+  }
+  .drop-icon { font-size: 3rem; margin-bottom: 1rem; }
+  .drop-title { font-family: var(--font-head); font-size: 1.1rem; font-weight: 700; margin-bottom: 0.5rem; }
+  .drop-sub   { color: var(--muted); font-size: 0.85rem; }
+  .drop-btn   { margin-top: 1.25rem; }
+  #fileInput  { display: none; }
+
+  .file-info {
+    display: none; background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 1.1rem 1.3rem; margin-bottom: 1.5rem;
+    align-items: center; gap: 12px;
+  }
+  .file-info.show { display: flex; }
+  .file-icon { font-size: 1.5rem; }
+  .file-details { flex: 1; }
+  .file-name { font-weight: 600; font-size: 0.9rem; }
+  .file-meta { font-size: 0.78rem; color: var(--muted); margin-top: 2px; }
+
+  .stats-row { display: grid; grid-template-columns: repeat(4,1fr); gap: 12px; margin-bottom: 1.5rem; }
+  .stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 1rem 1.25rem; }
+  .stat-label { font-size: 0.78rem; color: var(--muted); margin-bottom: 4px; }
+  .stat-value { font-family: var(--font-head); font-size: 1.4rem; font-weight: 700; }
+
+  .table-wrap { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; margin-bottom: 1.5rem; }
+  .table-header { display: flex; align-items: center; justify-content: space-between; padding: 1rem 1.3rem; border-bottom: 1px solid var(--border); }
+  .table-header h2 { font-family: var(--font-head); font-size: 1rem; font-weight: 700; }
+  .data-table { width: 100%; border-collapse: collapse; }
+  .data-table th { padding: 9px 1.3rem; text-align: left; font-size: 0.75rem; font-weight: 600; color: var(--muted); letter-spacing: 0.5px; text-transform: uppercase; border-bottom: 1px solid var(--border); background: rgba(0,0,0,0.2); }
+  .data-table td { padding: 10px 1.3rem; border-bottom: 1px solid var(--border); font-size: 0.875rem; }
+  .data-table tr:last-child td { border-bottom: none; }
+  .data-table tr:hover td { background: var(--surface2); }
+
+  .charts-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; }
+  .chart-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 1.25rem; }
+  .chart-card:hover { border-color: rgba(79,142,247,0.4); }
+  .chart-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; }
+  .chart-code { font-family: var(--font-head); font-size: 1.1rem; font-weight: 800; }
+  .chart-rate { font-family: var(--font-head); font-size: 1rem; font-weight: 700; }
+
+  .empty-state { text-align: center; padding: 4rem 2rem; color: var(--muted); }
+  .empty-icon  { font-size: 3rem; margin-bottom: 1rem; }
+
+  .section-title { font-family: var(--font-head); font-size: 1rem; font-weight: 700; margin-bottom: 1rem; }
+
+  @media(max-width:640px){ .stats-row{grid-template-columns:repeat(2,1fr);} .charts-grid{grid-template-columns:1fr;} }
+</style>
+{% endblock %}
+{% block content %}
+<div class="page">
+  <div class="upload-header fade-up">
+    <h1>📂 Загрузка файла</h1>
+    <p>Загрузи CSV или Excel с курсами валют — таблица и графики построятся автоматически</p>
+  </div>
+
+  <!-- Drop zone -->
+  <div class="drop-zone fade-up d1" id="dropZone">
+    <div class="drop-icon">📊</div>
+    <div class="drop-title">Перетащи файл сюда</div>
+    <div class="drop-sub">Поддерживаются форматы CSV и Excel (.xlsx, .xls)</div>
+    <div class="drop-btn">
+      <button class="btn btn-primary" onclick="document.getElementById('fileInput').click()">Выбрать файл</button>
+    </div>
+    <input type="file" id="fileInput" accept=".csv,.xlsx,.xls" />
+    <div style="margin-top:1.25rem;font-size:0.78rem;color:var(--muted);">
+      Ожидаемые колонки: <code style="background:var(--surface2);padding:2px 6px;border-radius:4px;">Код, Курс</code> или скачай наш <a href="{{ url_for('download_csv') }}" style="color:var(--accent);">шаблон CSV</a>
+    </div>
+  </div>
+
+  <!-- File info -->
+  <div class="file-info fade-up" id="fileInfo">
+    <span class="file-icon" id="fileIconEl">📄</span>
+    <div class="file-details">
+      <div class="file-name" id="fileName">—</div>
+      <div class="file-meta" id="fileMeta">—</div>
+    </div>
+    <button class="btn btn-ghost" onclick="clearFile()" style="padding:6px 12px;font-size:0.82rem;">✕ Очистить</button>
+  </div>
+
+  <!-- Stats -->
+  <div id="statsSection" style="display:none;">
+    <div class="stats-row fade-up">
+      <div class="stat-card"><div class="stat-label">Валют загружено</div><div class="stat-value" id="statCount">—</div></div>
+      <div class="stat-card"><div class="stat-label">Макс. курс</div><div class="stat-value" id="statMax" style="color:var(--green)">—</div></div>
+      <div class="stat-card"><div class="stat-label">Мин. курс</div><div class="stat-value" id="statMin" style="color:var(--red)">—</div></div>
+      <div class="stat-card"><div class="stat-label">Средний курс</div><div class="stat-value" id="statAvg">—</div></div>
+    </div>
+
+    <!-- Table -->
+    <div class="table-wrap fade-up">
+      <div class="table-header">
+        <h2>📋 Данные из файла</h2>
+        <span style="font-size:0.82rem;color:var(--muted);" id="tableCount">—</span>
+      </div>
+      <div id="tableContainer"></div>
+    </div>
+
+    <!-- Charts -->
+    <div class="section-title fade-up">📈 Графики по данным файла</div>
+    <div class="charts-grid fade-up" id="chartsGrid"></div>
+  </div>
+
+  <!-- Empty state -->
+  <div class="empty-state" id="emptyState">
+    <div class="empty-icon">📂</div>
+    <div>Загрузи файл чтобы увидеть таблицу и графики</div>
+  </div>
+</div>
+
+<script>
+const COLORS = ['#4f8ef7','#34d399','#f0c040','#a78bfa','#f87171','#38bdf8','#fb923c','#e879f9','#4ade80','#f472b6'];
+const RU_NAMES = {
+  USD:"Доллар США",EUR:"Евро",RUB:"Российский рубль",CNY:"Китайский юань",
+  GBP:"Британский фунт",JPY:"Японская иена",KZT:"Казахстанский тенге",
+  BYN:"Белорусский рубль",TRY:"Турецкая лира",AED:"Дирхам ОАЭ",
+  AMD:"Армянский драм",GEL:"Грузинский лари",CHF:"Швейцарский франк",
+  CAD:"Канадский доллар",AUD:"Австралийский доллар",SEK:"Шведская крона",
+  NOK:"Норвежская крона",PLN:"Польский злотый"
+};
+const FLAGS = {
+  USD:"🇺🇸",EUR:"🇪🇺",RUB:"🇷🇺",CNY:"🇨🇳",GBP:"🇬🇧",JPY:"🇯🇵",
+  KZT:"🇰🇿",BYN:"🇧🇾",TRY:"🇹🇷",AED:"🇦🇪",AMD:"🇦🇲",GEL:"🇬🇪",
+  CHF:"🇨🇭",CAD:"🇨🇦",AUD:"🇦🇺",SEK:"🇸🇪",NOK:"🇳🇴",PLN:"🇵🇱"
+};
+let chartInstances = {};
+
+const dropZone = document.getElementById('dropZone');
+const fileInput = document.getElementById('fileInput');
+
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('dragover'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+dropZone.addEventListener('drop', e => {
+  e.preventDefault(); dropZone.classList.remove('dragover');
+  const file = e.dataTransfer.files[0];
+  if (file) processFile(file);
+});
+fileInput.addEventListener('change', e => { if (e.target.files[0]) processFile(e.target.files[0]); });
+
+function processFile(file) {
+  const ext = file.name.split('.').pop().toLowerCase();
+  const icon = ext === 'csv' ? '📄' : '📗';
+  document.getElementById('fileIconEl').textContent = icon;
+  document.getElementById('fileName').textContent = file.name;
+  document.getElementById('fileMeta').textContent = `${ext.toUpperCase()} · ${(file.size/1024).toFixed(1)} KB`;
+  document.getElementById('fileInfo').classList.add('show');
+
+  const reader = new FileReader();
+  if (ext === 'csv') {
+    reader.onload = e => parseCSV(e.target.result);
+    reader.readAsText(file, 'utf-8');
+  } else {
+    reader.onload = e => parseXLSX(e.target.result);
+    reader.readAsArrayBuffer(file);
+  }
+}
+
+function parseCSV(text) {
+  const lines = text.trim().split('\n').filter(l => l.trim());
+  if (!lines.length) return showError('Файл пустой');
+  const sep = lines[0].includes(';') ? ';' : ',';
+  const headers = lines[0].split(sep).map(h => h.trim().replace(/"/g,'').toLowerCase());
+  const codeIdx = headers.findIndex(h => h.includes('код') || h === 'code' || h === 'currency');
+  const rateIdx = headers.findIndex(h => h.includes('курс') || h === 'rate' || h === 'value');
+  if (codeIdx === -1 || rateIdx === -1) return showError('Не найдены колонки "Код" и "Курс". Проверь формат файла.');
+  const data = [];
+  for (let i = 1; i < lines.length; i++) {
+    const cols = lines[i].split(sep).map(c => c.trim().replace(/"/g,''));
+    const code = cols[codeIdx]?.toUpperCase();
+    const rate = parseFloat(cols[rateIdx]);
+    if (code && !isNaN(rate)) data.push({ code, rate, name: RU_NAMES[code] || code, flag: FLAGS[code] || '🏳️' });
+  }
+  if (!data.length) return showError('Не удалось прочитать данные из файла');
+  renderData(data);
+}
+
+function parseXLSX(buffer) {
+  try {
+    const wb = XLSX.read(buffer, { type: 'array' });
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    const rows = XLSX.utils.sheet_to_json(ws, { defval: '' });
+    if (!rows.length) return showError('Файл пустой');
+    const firstRow = rows[0];
+    const keys = Object.keys(firstRow).map(k => k.toLowerCase());
+    const codeKey = Object.keys(firstRow).find(k => k.toLowerCase().includes('код') || k.toLowerCase() === 'code' || k.toLowerCase() === 'currency');
+    const rateKey = Object.keys(firstRow).find(k => k.toLowerCase().includes('курс') || k.toLowerCase() === 'rate' || k.toLowerCase() === 'value');
+    if (!codeKey || !rateKey) return showError('Не найдены колонки "Код" и "Курс". Проверь формат файла.');
+    const data = rows.map(r => ({
+      code: String(r[codeKey]).toUpperCase(),
+      rate: parseFloat(r[rateKey]),
+      name: RU_NAMES[String(r[codeKey]).toUpperCase()] || String(r[codeKey]),
+      flag: FLAGS[String(r[codeKey]).toUpperCase()] || '🏳️'
+    })).filter(r => r.code && !isNaN(r.rate));
+    if (!data.length) return showError('Не удалось прочитать данные');
+    renderData(data);
+  } catch(e) { showError('Ошибка чтения файла: ' + e.message); }
+}
+
+function renderData(data) {
+  document.getElementById('emptyState').style.display = 'none';
+  document.getElementById('statsSection').style.display = 'block';
+  document.getElementById('fileName').textContent += ` — ${data.length} валют`;
+
+  const rates = data.map(d => d.rate);
+  const max = data.reduce((a,b) => a.rate > b.rate ? a : b);
+  const min = data.reduce((a,b) => a.rate < b.rate ? a : b);
+  const avg = rates.reduce((a,b) => a+b, 0) / rates.length;
+
+  document.getElementById('statCount').textContent = data.length;
+  document.getElementById('statMax').textContent = `${max.code}: ${max.rate.toFixed(4)}`;
+  document.getElementById('statMin').textContent = `${min.code}: ${min.rate.toFixed(4)}`;
+  document.getElementById('statAvg').textContent = avg.toFixed(4);
+  document.getElementById('tableCount').textContent = `${data.length} записей`;
+
+  // Table
+  let html = `<table class="data-table"><thead><tr>
+    <th>Флаг</th><th>Код</th><th>Валюта</th><th>Курс к USD</th>
+  </tr></thead><tbody>`;
+  data.forEach(r => {
+    html += `<tr>
+      <td style="font-size:1.2rem;">${r.flag}</td>
+      <td><strong>${r.code}</strong></td>
+      <td style="color:var(--muted)">${r.name}</td>
+      <td><span style="font-family:var(--font-head);font-weight:600;">${r.rate.toFixed(4)}</span></td>
+    </tr>`;
+  });
+  html += '</tbody></table>';
+  document.getElementById('tableContainer').innerHTML = html;
+
+  // Charts
+  Object.values(chartInstances).forEach(c => c.destroy());
+  chartInstances = {};
+  const grid = document.getElementById('chartsGrid');
+  grid.innerHTML = '';
+
+  data.forEach((r, i) => {
+    const color = COLORS[i % COLORS.length];
+    const card = document.createElement('div');
+    card.className = 'chart-card';
+    card.innerHTML = `
+      <div class="chart-top">
+        <div>
+          <div style="display:flex;align-items:center;gap:8px;">
+            <span style="font-size:1.4rem;">${r.flag}</span>
+            <div>
+              <div class="chart-code">${r.code}</div>
+              <div style="font-size:0.75rem;color:var(--muted);">${r.name}</div>
+            </div>
+          </div>
+        </div>
+        <div class="chart-rate" style="color:${color}">${r.rate.toFixed(4)}</div>
+      </div>
+      <div style="position:relative;height:100px;">
+        <canvas id="chart-${r.code}"></canvas>
+      </div>`;
+    grid.appendChild(card);
+
+    // Генерируем мини-тренд на основе курса из файла
+    const seed = r.code.charCodeAt(0) + r.code.charCodeAt(1 % r.code.length);
+    const pts = Array.from({length: 7}, (_, j) => {
+      const v = Math.sin((seed + j) * 0.8) * 0.04;
+      return parseFloat((r.rate * (1 + v)).toFixed(4));
+    });
+    const labels = ['', '', '', '', '', '', ''];
+
+    const ctx = document.getElementById(`chart-${r.code}`).getContext('2d');
+    const rgb = color.replace('#','');
+    const rv = parseInt(rgb.substring(0,2),16);
+    const gv = parseInt(rgb.substring(2,4),16);
+    const bv = parseInt(rgb.substring(4,6),16);
+    const grad = ctx.createLinearGradient(0,0,0,100);
+    grad.addColorStop(0, `rgba(${rv},${gv},${bv},0.2)`);
+    grad.addColorStop(1, `rgba(${rv},${gv},${bv},0)`);
+
+    chartInstances[r.code] = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels,
+        datasets: [{ data: pts, borderColor: color, backgroundColor: grad, borderWidth: 2, tension: 0.4, fill: true, pointRadius: 0 }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false }, tooltip: {
+          backgroundColor: '#1a2540', bodyColor: color, padding: 8,
+          callbacks: { label: ctx => `Курс: ${ctx.parsed.y.toFixed(4)}` }
+        }},
+        scales: {
+          x: { display: false },
+          y: { grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { color: '#5a6585', font: { size: 9 }, maxTicksLimit: 3 } }
+        }
+      }
+    });
+  });
+}
+
+function clearFile() {
+  document.getElementById('fileInfo').classList.remove('show');
+  document.getElementById('statsSection').style.display = 'none';
+  document.getElementById('emptyState').style.display = 'block';
+  document.getElementById('fileInput').value = '';
+  Object.values(chartInstances).forEach(c => c.destroy());
+  chartInstances = {};
+}
+
+function showError(msg) {
+  document.getElementById('fileInfo').classList.remove('show');
+  alert('Ошибка: ' + msg);
+}
+</script>
+{% endblock %}

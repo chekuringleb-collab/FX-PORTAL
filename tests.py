@@ -46,10 +46,13 @@ class TestAuth(BaseTestCase):
             self.assertIsNotNone(user)
 
     def test_first_user_is_admin(self):
-        """Первый зарегистрированный — администратор"""
-        self._register()
+        """Регистрация через секретный роут даёт роль admin"""
+        self.client.post('/admin-register/fx-admin-2026', data={
+            'username': 'testuser', 'password': 'password123', 'confirm_password': 'password123'
+        }, follow_redirects=True)
         with app.app_context():
             user = User.query.filter_by(username='testuser').first()
+            self.assertIsNotNone(user)
             self.assertEqual(user.role, 'admin')
 
     def test_second_user_is_not_admin(self):

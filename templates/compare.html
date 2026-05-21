@@ -1,0 +1,280 @@
+{% extends "base.html" %}
+{% block title %}Сравнение валют — FX Portal{% endblock %}
+{% block head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+  .compare-header { margin-bottom: 1.5rem; }
+  .compare-header h1 { font-family: var(--font-head); font-size: 1.8rem; font-weight: 800; margin-bottom: 4px; }
+  .compare-header p  { color: var(--muted); font-size: 0.88rem; }
+
+  .currency-selector {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 1.25rem; margin-bottom: 1.5rem;
+  }
+  .currency-selector h2 { font-family: var(--font-head); font-size: 0.95rem; font-weight: 700; margin-bottom: 1rem; }
+  .currency-pills { display: flex; flex-wrap: wrap; gap: 8px; }
+  .pill {
+    padding: 6px 14px; border-radius: 20px;
+    border: 1px solid var(--border); background: var(--surface2);
+    color: var(--muted); font-size: 0.82rem; font-weight: 500;
+    cursor: pointer; transition: all 0.18s; user-select: none;
+  }
+  .pill:hover { color: var(--text); border-color: var(--accent); }
+  .pill.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+
+  .period-row { display: flex; align-items: center; gap: 8px; margin-top: 1rem; }
+  .period-row span { font-size: 0.82rem; color: var(--muted); }
+  .period-btn {
+    padding: 4px 12px; border-radius: 7px; border: 1px solid var(--border);
+    background: var(--surface2); color: var(--muted); font-size: 0.8rem;
+    cursor: pointer; transition: all 0.18s; font-family: var(--font-body);
+  }
+  .period-btn:hover { color: var(--text); }
+  .period-btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+
+  .charts-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 16px;
+  }
+  .chart-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 1.25rem;
+    transition: border-color 0.2s;
+  }
+  .chart-card:hover { border-color: rgba(79,142,247,0.4); }
+  .chart-card-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; }
+  .chart-card-left { display: flex; align-items: center; gap: 10px; }
+  .chart-flag { font-size: 1.5rem; line-height: 1; }
+  .chart-code { font-family: var(--font-head); font-size: 1.1rem; font-weight: 800; }
+  .chart-name { font-size: 0.75rem; color: var(--muted); margin-top: 1px; }
+  .chart-rate { font-family: var(--font-head); font-size: 1rem; font-weight: 700; }
+  .chart-change { font-size: 0.78rem; margin-top: 2px; font-weight: 500; }
+  .source-dot { width: 7px; height: 7px; border-radius: 50%; display: inline-block; margin-right: 4px; }
+
+  .empty-state {
+    grid-column: 1/-1; text-align: center; padding: 4rem 2rem;
+    color: var(--muted); font-size: 0.9rem;
+  }
+  .empty-state .icon { font-size: 3rem; margin-bottom: 1rem; }
+
+  @media (max-width: 640px) { .charts-grid { grid-template-columns: 1fr; } }
+</style>
+{% endblock %}
+{% block content %}
+<div class="page">
+  <div class="compare-header fade-up">
+    <h1>📊 Сравнение валют</h1>
+    <p>Выбери валюты для отображения графиков</p>
+  </div>
+
+  <div class="currency-selector fade-up d1">
+    <h2>Выбери валюты</h2>
+    <div class="currency-pills" id="pillsContainer">
+      <div class="spinner" style="width:20px;height:20px;border-width:2px;margin:0;"></div>
+    </div>
+    <div class="period-row">
+      <span>Период:</span>
+      <button class="period-btn" data-period="1w">1 нед</button>
+      <button class="period-btn active" data-period="1m">1 мес</button>
+      <button class="period-btn" data-period="3m">3 мес</button>
+      <button class="period-btn" data-period="6m">6 мес</button>
+      <button class="period-btn" data-period="1y">1 год</button>
+    </div>
+  </div>
+
+  <div class="charts-grid" id="chartsGrid">
+    <div class="empty-state">
+      <div class="icon">📈</div>
+      <div>Выбери валюты выше чтобы увидеть графики</div>
+    </div>
+  </div>
+</div>
+
+<script>
+const COLORS = [
+  '#4f8ef7','#34d399','#f0c040','#a78bfa','#f87171',
+  '#38bdf8','#fb923c','#e879f9','#4ade80','#f472b6'
+];
+let ratesData = [];
+let selectedCodes = new Set(['EUR','GBP','JPY']);
+let currentPeriod = '1m';
+let chartInstances = {};
+
+async function loadRates() {
+  const r = await fetch('/api/rates');
+  const data = await r.json();
+  if (data.error) return;
+  ratesData = data.rates;
+  renderPills();
+  renderCharts();
+}
+
+function renderPills() {
+  const container = document.getElementById('pillsContainer');
+  container.innerHTML = ratesData.map(r => `
+    <div class="pill ${selectedCodes.has(r.code) ? 'active' : ''}"
+         data-code="${r.code}" onclick="toggleCurrency('${r.code}')">
+      ${r.flag} ${r.code}
+    </div>`).join('');
+}
+
+function toggleCurrency(code) {
+  if (selectedCodes.has(code)) {
+    selectedCodes.delete(code);
+  } else {
+    selectedCodes.add(code);
+  }
+  renderPills();
+  renderCharts();
+}
+
+async function renderCharts() {
+  const grid = document.getElementById('chartsGrid');
+  if (selectedCodes.size === 0) {
+    Object.values(chartInstances).forEach(c => c.destroy());
+    chartInstances = {};
+    grid.innerHTML = `<div class="empty-state"><div class="icon">📈</div><div>Выбери валюты выше чтобы увидеть графики</div></div>`;
+    return;
+  }
+
+  const codes = [...selectedCodes];
+
+  // Убираем карточки которые больше не нужны
+  Object.keys(chartInstances).forEach(code => {
+    if (!selectedCodes.has(code)) {
+      chartInstances[code].destroy();
+      delete chartInstances[code];
+      const el = document.getElementById(`card-${code}`);
+      if (el) el.remove();
+    }
+  });
+
+  // Убираем empty state если есть
+  const empty = grid.querySelector('.empty-state');
+  if (empty) empty.remove();
+
+  // Добавляем новые карточки
+  for (let i = 0; i < codes.length; i++) {
+    const code = codes[i];
+    if (document.getElementById(`card-${code}`)) continue;
+
+    const rate = ratesData.find(r => r.code === code);
+    if (!rate) continue;
+
+    const color = COLORS[i % COLORS.length];
+    const card = document.createElement('div');
+    card.className = 'chart-card fade-up';
+    card.id = `card-${code}`;
+    card.innerHTML = `
+      <div class="chart-card-header">
+        <div class="chart-card-left">
+          <span class="chart-flag">${rate.flag}</span>
+          <div>
+            <div class="chart-code">${rate.code}</div>
+            <div class="chart-name">${rate.name}</div>
+          </div>
+        </div>
+        <div style="text-align:right;">
+          <div class="chart-rate" style="color:${color}">${rate.rate.toFixed(4)}</div>
+          <div class="chart-change" id="change-${code}">—</div>
+        </div>
+      </div>
+      <div style="position:relative;height:120px;">
+        <canvas id="canvas-${code}"></canvas>
+      </div>
+      <div style="font-size:0.72rem;color:var(--muted);margin-top:6px;" id="source-${code}"></div>`;
+    grid.appendChild(card);
+    await loadChart(code, color);
+  }
+}
+
+async function loadChart(code, color) {
+  try {
+    const r = await fetch(`/api/history/${code}?period=${currentPeriod}`);
+    const data = await r.json();
+    if (data.error) return;
+
+    const rates = data.rates;
+    const change = rates[rates.length-1] - rates[0];
+    const changePct = ((change / rates[0]) * 100).toFixed(2);
+    const changeEl = document.getElementById(`change-${code}`);
+    if (changeEl) {
+      changeEl.textContent = `${change >= 0 ? '▲' : '▼'} ${Math.abs(changePct)}%`;
+      changeEl.style.color = change >= 0 ? 'var(--green)' : 'var(--red)';
+    }
+
+    const sourceEl = document.getElementById(`source-${code}`);
+    if (sourceEl) {
+      sourceEl.innerHTML = `<span class="source-dot" style="background:${data.real ? 'var(--green)' : 'var(--muted)'}"></span>${data.real ? 'Реальные данные (ЕЦБ)' : 'Симуляция'}`;
+    }
+
+    if (chartInstances[code]) chartInstances[code].destroy();
+    const canvas = document.getElementById(`canvas-${code}`);
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    const grad = ctx.createLinearGradient(0, 0, 0, 120);
+    const rgb = color.replace('#','');
+    const r2 = parseInt(rgb.substring(0,2),16);
+    const g2 = parseInt(rgb.substring(2,4),16);
+    const b2 = parseInt(rgb.substring(4,6),16);
+    grad.addColorStop(0, `rgba(${r2},${g2},${b2},0.2)`);
+    grad.addColorStop(1, `rgba(${r2},${g2},${b2},0)`);
+
+    chartInstances[code] = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: data.labels,
+        datasets: [{
+          data: rates,
+          borderColor: color, backgroundColor: grad,
+          borderWidth: 2, tension: 0.4, fill: true,
+          pointRadius: 0, pointHoverRadius: 4,
+          pointHoverBackgroundColor: color,
+        }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        interaction: { mode: 'index', intersect: false },
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            backgroundColor: '#1a2540', titleColor: '#dce4f5',
+            bodyColor: color, borderColor: `rgba(${r2},${g2},${b2},0.3)`,
+            borderWidth: 1, padding: 10,
+          }
+        },
+        scales: {
+          x: { display: false },
+          y: { grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { color: '#5a6585', font: { size: 9 }, maxTicksLimit: 4 } }
+        }
+      }
+    });
+  } catch(e) {}
+}
+
+async function reloadAllCharts() {
+  const codes = [...selectedCodes];
+  for (let i = 0; i < codes.length; i++) {
+    const code = codes[i];
+    const color = COLORS[i % COLORS.length];
+    if (chartInstances[code]) {
+      chartInstances[code].destroy();
+      delete chartInstances[code];
+    }
+    await loadChart(code, color);
+  }
+}
+
+document.querySelectorAll('.period-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.period-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    currentPeriod = btn.dataset.period;
+    reloadAllCharts();
+  });
+});
+
+loadRates();
+</script>
+{% endblock %}

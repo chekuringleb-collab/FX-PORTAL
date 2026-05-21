@@ -98,11 +98,13 @@
     <span class="logo-icon">₿</span>FX Portal
   </a>
   <div class="navbar-links">
-    <a href="{{ url_for('index') }}" class="nav-link {% if request.endpoint == 'index' %}active{% endif %}" style="color:var(--green)">Курсы</a>
+    <a href="{{ url_for('index') }}" class="nav-link {% if request.endpoint == 'index' %}active{% endif %}">Курсы</a>
+    <a href="{{ url_for('compare_page') }}" class="nav-link {% if request.endpoint == 'compare_page' %}active{% endif %}">📊 Сравнение</a>
+    <a href="{{ url_for('upload_page') }}" class="nav-link {% if request.endpoint == 'upload_page' %}active{% endif %}">📂 Загрузка</a>
     {% if current_user.is_admin %}
-    <a href="{{ url_for('admin_panel') }}" class="nav-link {% if request.endpoint == 'admin_panel' %}active{% endif %}" style="color:var(--green)">⚙ Админ</a>
+    <a href="{{ url_for('admin_panel') }}" class="nav-link {% if request.endpoint == 'admin_panel' %}active{% endif %}">⚙ Админ</a>
     {% endif %}
-    <a href="{{ url_for('download_csv') }}" class="nav-link" style="color:var(--green)">↓ CSV</a>
+    <a href="{{ url_for('download_csv') }}" class="nav-link">↓ CSV</a>
     <a href="{{ url_for('download_xlsx') }}" class="nav-link" style="color:var(--green)">↓ Excel</a>
   </div>
   <div style="display:flex;align-items:center;gap:8px;">
