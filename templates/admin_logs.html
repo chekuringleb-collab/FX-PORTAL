@@ -7,18 +7,29 @@
   .logs-header { margin-bottom: 1.5rem; }
   .logs-header h1 { font-family:var(--font-head);font-size:1.8rem;font-weight:800;margin-bottom:4px; }
   .logs-header p  { color:var(--muted);font-size:0.88rem; }
+  .search-bar { display:flex;gap:10px;margin-bottom:1.5rem; }
+  .search-bar input {
+    flex:1; background:var(--surface); border:1px solid var(--border);
+    color:var(--text); border-radius:10px; padding:10px 14px;
+    font-family:var(--font-body); font-size:0.9rem; outline:none; transition:border-color 0.2s;
+  }
+  .search-bar input:focus { border-color:var(--accent); }
   .logs-wrap { background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden; }
-  .log-item { padding:11px 1.3rem;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px;font-size:0.85rem; }
+  .logs-wrap-header { display:flex;align-items:center;justify-content:space-between;padding:1.1rem 1.3rem;border-bottom:1px solid var(--border); }
+  .logs-wrap-header h2 { font-family:var(--font-head);font-size:1rem;font-weight:700; }
+  .log-item { padding:11px 1.3rem;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px;font-size:0.85rem;transition:background 0.15s; }
   .log-item:last-child { border-bottom:none; }
   .log-item:hover { background:var(--surface2); }
-  .log-num    { color:var(--muted);font-size:0.75rem;font-family:monospace;min-width:30px; }
+  .log-num    { color:var(--muted);font-size:0.75rem;font-family:monospace;min-width:40px; }
   .log-user   { font-weight:600;color:var(--accent);min-width:110px; }
   .log-action { color:var(--text);flex:1; }
   .log-ip     { color:var(--muted);font-size:0.75rem;font-family:monospace;min-width:100px; }
   .log-time   { color:var(--muted);font-size:0.78rem;white-space:nowrap; }
+  .highlight  { background:rgba(79,142,247,0.2);border-radius:3px;padding:0 2px; }
   .pagination { display:flex;gap:8px;justify-content:center;margin-top:1.5rem; }
   .page-btn { padding:6px 14px;border-radius:8px;background:var(--surface);border:1px solid var(--border);color:var(--muted);text-decoration:none;font-size:0.85rem;transition:all 0.18s; }
   .page-btn:hover, .page-btn.active { background:var(--accent);color:#fff;border-color:var(--accent); }
+  .no-results { padding:3rem;text-align:center;color:var(--muted); }
 </style>
 {% endblock %}
 {% block content %}
@@ -29,34 +40,65 @@
     <p>Все действия пользователей в системе</p>
   </div>
 
-  <div class="logs-wrap fade-up d2">
+  <!-- Поиск -->
+  <form class="search-bar fade-up d2" method="GET" action="{{ url_for('admin_logs') }}">
+    <input type="text" name="q" value="{{ search }}" placeholder="Поиск по пользователю или действию..." />
+    <button type="submit" class="btn btn-primary">🔍 Найти</button>
+    {% if search %}
+    <a href="{{ url_for('admin_logs') }}" class="btn btn-ghost">✕ Сбросить</a>
+    {% endif %}
+  </form>
+
+  <div class="logs-wrap fade-up d3">
+    <div class="logs-wrap-header">
+      <h2>
+        {% if search %}
+          Результаты поиска: «{{ search }}»
+        {% else %}
+          Все логи
+        {% endif %}
+      </h2>
+      <span style="font-size:0.82rem;color:var(--muted);">{{ logs.total }} записей</span>
+    </div>
     {% if logs.items %}
       {% for log in logs.items %}
       <div class="log-item">
         <span class="log-num">#{{ log.id }}</span>
         <span class="log-user">{{ log.user.username }}</span>
-        <span class="log-action">{{ log.action }}</span>
+        <span class="log-action">
+          {% if search %}
+            {{ log.action | replace(search, '<span class="highlight">' ~ search ~ '</span>') | safe }}
+          {% else %}
+            {{ log.action }}
+          {% endif %}
+        </span>
         <span class="log-ip">{{ log.ip_address or '—' }}</span>
         <span class="log-time">{{ log.created_at.strftime('%d.%m.%Y %H:%M') }}</span>
       </div>
       {% endfor %}
     {% else %}
-      <div style="padding:2rem;text-align:center;color:var(--muted)">Логов пока нет</div>
+      <div class="no-results">
+        {% if search %}
+          😔 По запросу «{{ search }}» ничего не найдено
+        {% else %}
+          Логов пока нет
+        {% endif %}
+      </div>
     {% endif %}
   </div>
 
   {% if logs.pages > 1 %}
   <div class="pagination">
     {% if logs.has_prev %}
-    <a href="{{ url_for('admin_logs', page=logs.prev_num) }}" class="page-btn">← Назад</a>
+    <a href="{{ url_for('admin_logs', page=logs.prev_num, q=search) }}" class="page-btn">← Назад</a>
     {% endif %}
     {% for p in logs.iter_pages() %}
       {% if p %}
-      <a href="{{ url_for('admin_logs', page=p) }}" class="page-btn {% if p == logs.page %}active{% endif %}">{{ p }}</a>
+      <a href="{{ url_for('admin_logs', page=p, q=search) }}" class="page-btn {% if p == logs.page %}active{% endif %}">{{ p }}</a>
       {% endif %}
     {% endfor %}
     {% if logs.has_next %}
-    <a href="{{ url_for('admin_logs', page=logs.next_num) }}" class="page-btn">Вперёд →</a>
+    <a href="{{ url_for('admin_logs', page=logs.next_num, q=search) }}" class="page-btn">Вперёд →</a>
     {% endif %}
   </div>
   {% endif %}

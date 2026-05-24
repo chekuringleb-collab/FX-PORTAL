@@ -93,6 +93,21 @@
     <div class="stat-card"><div class="stat-label">EUR/USD</div><div class="stat-value" id="eurRate">—</div><div class="stat-sub">евро за доллар</div></div>
   </div>
 
+  <!-- Виджет курса дня -->
+  <div id="moversWidget" style="display:none;margin-bottom:1.5rem;" class="fade-up">
+    <div style="font-family:var(--font-head);font-size:0.95rem;font-weight:700;margin-bottom:0.75rem;">📈 Курс дня</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+      <div style="background:rgba(52,211,153,0.08);border:1px solid rgba(52,211,153,0.2);border-radius:var(--radius);padding:1rem;">
+        <div style="font-size:0.75rem;color:var(--green);font-weight:600;margin-bottom:8px;">▲ ЛИДЕРЫ РОСТА</div>
+        <div id="topMovers"></div>
+      </div>
+      <div style="background:rgba(248,113,113,0.08);border:1px solid rgba(248,113,113,0.2);border-radius:var(--radius);padding:1rem;">
+        <div style="font-size:0.75rem;color:var(--red);font-weight:600;margin-bottom:8px;">▼ ЛИДЕРЫ ПАДЕНИЯ</div>
+        <div id="bottomMovers"></div>
+      </div>
+    </div>
+  </div>
+
   <div class="main-grid">
     <div class="rates-wrap fade-up d2">
       <div class="rates-header">
@@ -148,6 +163,7 @@
 
 <script>
 let ratesData = [];
+let favorites = new Set({{ favorites | tojson }});
 let miniChartInstance = null;
 
 async function loadRates() {
@@ -176,8 +192,9 @@ function updateStats(data) {
 
 function renderTable(rates) {
   if (!rates.length) { document.getElementById('tableContainer').innerHTML = '<div style="padding:2rem;text-align:center;color:var(--muted)">Нет данных</div>'; return; }
-  let html = `<table class="rates-table"><thead><tr><th>Валюта</th><th>Курс к USD</th><th>График</th></tr></thead><tbody>`;
+  let html = `<table class="rates-table"><thead><tr><th>Валюта</th><th>Курс к USD</th><th>График</th><th>★</th></tr></thead><tbody>`;
   rates.forEach(r => {
+    const isFav = favorites.has(r.code);
     html += `<tr>
       <td><div class="currency-cell">
         <span class="currency-flag">${r.flag}</span>
@@ -185,6 +202,11 @@ function renderTable(rates) {
       </div></td>
       <td><span class="rate-value">${r.rate.toFixed(4)}</span></td>
       <td><a class="history-link" href="/history/${r.code}">Тренд →</a></td>
+      <td>
+        <button onclick="toggleFav('${r.code}')" id="fav-${r.code}"
+          style="background:none;border:none;cursor:pointer;font-size:1.1rem;opacity:${isFav?1:0.3};transition:opacity 0.2s;"
+          title="${isFav?'Убрать из избранного':'Добавить в избранное'}">⭐</button>
+      </td>
     </tr>`;
   });
   html += '</tbody></table>';
@@ -285,7 +307,41 @@ document.getElementById('swapBtn').addEventListener('click', () => {
   convert();
 });
 
+async function toggleFav(code) {
+  const r = await fetch(`/api/favorites/toggle/${code}`, {method:'POST'});
+  const data = await r.json();
+  if (data.favorites) {
+    favorites = new Set(data.favorites);
+    const btn = document.getElementById(`fav-${code}`);
+    if (btn) btn.style.opacity = favorites.has(code) ? '1' : '0.3';
+  }
+}
+
+async function loadMovers() {
+  try {
+    const r = await fetch('/api/top-movers');
+    const data = await r.json();
+    if (!data.top.length && !data.bottom.length) return;
+    document.getElementById('moversWidget').style.display = 'block';
+    const renderMover = (m, color) => `
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--border);">
+        <div style="display:flex;align-items:center;gap:6px;">
+          <span>${m.flag}</span>
+          <span style="font-weight:600;font-size:0.85rem;">${m.code}</span>
+        </div>
+        <div style="text-align:right;">
+          <div style="font-size:0.85rem;font-weight:600;">${m.rate.toFixed(4)}</div>
+          <div style="font-size:0.75rem;color:${color};">${m.change > 0 ? '+' : ''}${m.change}%</div>
+        </div>
+      </div>`;
+    document.getElementById('topMovers').innerHTML = data.top.map(m => renderMover(m, 'var(--green)')).join('');
+    document.getElementById('bottomMovers').innerHTML = data.bottom.map(m => renderMover(m, 'var(--red)')).join('');
+  } catch(e) {}
+}
+
 loadRates();
+loadMovers();
 setInterval(loadRates, 60000);
+setInterval(loadMovers, 300000);
 </script>
 {% endblock %}

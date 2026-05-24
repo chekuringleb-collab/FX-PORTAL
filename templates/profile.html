@@ -1,0 +1,116 @@
+{% extends "base.html" %}
+{% block title %}Профиль — FX Portal{% endblock %}
+{% block head %}
+<style>
+  .profile-header { margin-bottom: 2rem; }
+  .profile-header h1 { font-family: var(--font-head); font-size: 1.8rem; font-weight: 800; margin-bottom: 4px; }
+  .profile-header p  { color: var(--muted); font-size: 0.88rem; }
+  .profile-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+  .section-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 1.5rem; }
+  .section-card h2 { font-family: var(--font-head); font-size: 1rem; font-weight: 700; margin-bottom: 1.25rem; }
+  .info-row { display: flex; align-items: center; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid var(--border); font-size: 0.875rem; }
+  .info-row:last-child { border-bottom: none; }
+  .info-label { color: var(--muted); }
+  .info-value { font-weight: 500; }
+  .theme-options { display: flex; gap: 10px; margin-top: 0.5rem; }
+  .theme-option { flex: 1; padding: 12px; border-radius: 10px; border: 2px solid var(--border); cursor: pointer; text-align: center; transition: all 0.18s; font-size: 0.875rem; font-weight: 500; }
+  .theme-option.active { border-color: var(--accent); background: rgba(79,142,247,0.08); color: var(--accent); }
+  .theme-option:hover { border-color: var(--accent); }
+  .log-item { padding: 8px 0; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 0.82rem; }
+  .log-item:last-child { border-bottom: none; }
+  .log-action { color: var(--text); flex: 1; }
+  .log-time   { color: var(--muted); white-space: nowrap; }
+  @media(max-width:700px){ .profile-grid{grid-template-columns:1fr;} }
+</style>
+{% endblock %}
+{% block content %}
+<div class="page">
+  <div class="profile-header fade-up">
+    <h1>👤 Профиль</h1>
+    <p>Управление аккаунтом и настройки</p>
+  </div>
+
+  <div class="profile-grid">
+    <!-- Информация -->
+    <div class="section-card fade-up d1">
+      <h2>ℹ️ Информация</h2>
+      <div class="info-row"><span class="info-label">Логин</span><span class="info-value">{{ user.username }}</span></div>
+      <div class="info-row"><span class="info-label">Роль</span>
+        <span class="info-value" style="color:{{ 'var(--accent)' if user.is_admin else 'var(--muted)' }}">{{ user.role }}</span>
+      </div>
+      <div class="info-row"><span class="info-label">Статус</span>
+        <span class="info-value" style="color:{{ 'var(--red)' if user.is_blocked else 'var(--green)' }}">
+          {{ '🔴 Заблокирован' if user.is_blocked else '🟢 Активен' }}
+        </span>
+      </div>
+      <div class="info-row"><span class="info-label">Регистрация</span>
+        <span class="info-value">{{ user.created_at.strftime('%d.%m.%Y') if user.created_at else '—' }}</span>
+      </div>
+      <div class="info-row"><span class="info-label">Последний вход</span>
+        <span class="info-value">{{ user.last_login.strftime('%d.%m.%Y %H:%M') if user.last_login else '—' }}</span>
+      </div>
+      <div class="info-row"><span class="info-label">Всего входов</span>
+        <span class="info-value">{{ user.login_count or 0 }}</span>
+      </div>
+      <div class="info-row"><span class="info-label">Избранных валют</span>
+        <span class="info-value">{{ user.favorites_list | length }}</span>
+      </div>
+    </div>
+
+    <!-- Тема -->
+    <div class="section-card fade-up d2">
+      <h2>🎨 Тема оформления</h2>
+      <p style="font-size:0.85rem;color:var(--muted);margin-bottom:1rem;">Выбери тему интерфейса</p>
+      <form method="POST" action="{{ url_for('profile') }}">
+        <input type="hidden" name="action" value="change_theme">
+        <div class="theme-options">
+          <button type="submit" name="theme" value="dark"
+            class="theme-option {{ 'active' if user.theme == 'dark' else '' }}">
+            🌙 Тёмная
+          </button>
+          <button type="submit" name="theme" value="light"
+            class="theme-option {{ 'active' if user.theme == 'light' else '' }}">
+            ☀️ Светлая
+          </button>
+        </div>
+      </form>
+    </div>
+
+    <!-- Смена пароля -->
+    <div class="section-card fade-up d3">
+      <h2>🔒 Смена пароля</h2>
+      <form method="POST" action="{{ url_for('profile') }}" style="display:flex;flex-direction:column;gap:1rem;">
+        <input type="hidden" name="action" value="change_password">
+        <div class="input-group">
+          <label>Текущий пароль</label>
+          <input type="password" name="old_password" placeholder="Введите текущий пароль" required />
+        </div>
+        <div class="input-group">
+          <label>Новый пароль</label>
+          <input type="password" name="new_password" placeholder="Минимум 8 символов" required />
+        </div>
+        <div class="input-group">
+          <label>Подтверждение</label>
+          <input type="password" name="confirm_password" placeholder="Повторите новый пароль" required />
+        </div>
+        <button type="submit" class="btn btn-primary" style="justify-content:center;">Сменить пароль</button>
+      </form>
+    </div>
+
+    <!-- Последние действия -->
+    <div class="section-card fade-up d4">
+      <h2>📋 Последние действия</h2>
+      {% if logs %}
+        {% for log in logs %}
+        <div class="log-item">
+          <span class="log-action">{{ log.action }}</span>
+          <span class="log-time">{{ log.created_at.strftime('%d.%m %H:%M') }}</span>
+        </div>
+        {% endfor %}
+      {% else %}
+        <div style="color:var(--muted);font-size:0.875rem;">Действий пока нет</div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}

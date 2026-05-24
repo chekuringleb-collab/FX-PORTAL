@@ -1,0 +1,257 @@
+{% extends "base.html" %}
+{% block title %}Калькулятор — FX Portal{% endblock %}
+{% block head %}
+<style>
+  .calc-header { margin-bottom: 2rem; }
+  .calc-header h1 { font-family: var(--font-head); font-size: 1.8rem; font-weight: 800; margin-bottom: 4px; }
+  .calc-header p  { color: var(--muted); font-size: 0.88rem; }
+  .calc-grid { display: grid; grid-template-columns: 360px 1fr; gap: 20px; }
+  .calc-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 1.5rem; }
+  .calc-card h2 { font-family: var(--font-head); font-size: 1rem; font-weight: 700; margin-bottom: 1.25rem; }
+  .calc-display {
+    background: var(--bg); border: 1px solid var(--border); border-radius: 10px;
+    padding: 1rem; margin-bottom: 1rem; text-align: right; min-height: 80px;
+  }
+  .calc-expr   { font-size: 0.82rem; color: var(--muted); min-height: 20px; word-break: break-all; }
+  .calc-result { font-family: var(--font-head); font-size: 2rem; font-weight: 800; color: var(--accent); margin-top: 4px; word-break: break-all; }
+  .calc-result.error { color: var(--red); font-size: 1.4rem; }
+  .calc-buttons { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+  .calc-btn {
+    padding: 14px; border-radius: 10px; border: 1px solid var(--border);
+    background: var(--surface2); color: var(--text); font-size: 1rem;
+    font-family: var(--font-head); font-weight: 600; cursor: pointer;
+    transition: all 0.15s; text-align: center; user-select: none;
+  }
+  .calc-btn:hover  { background: #1e2a45; border-color: var(--accent); }
+  .calc-btn:active { transform: scale(0.95); }
+  .calc-btn.op    { color: var(--accent); }
+  .calc-btn.eq    { background: var(--accent); color: #fff; border-color: var(--accent); grid-column: span 2; }
+  .calc-btn.eq:hover  { filter: brightness(1.15); }
+  .calc-btn.clear { color: var(--red); }
+  .calc-btn.wide  { grid-column: span 2; }
+  .history-wrap { display: flex; flex-direction: column; gap: 8px; max-height: 500px; overflow-y: auto; }
+  .history-item {
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 10px; padding: 12px 14px; cursor: pointer;
+    transition: all 0.18s; display: flex; align-items: center; justify-content: space-between;
+  }
+  .history-item:hover { border-color: var(--accent); }
+  .history-expr { font-size: 0.82rem; color: var(--muted); }
+  .history-res  { font-family: var(--font-head); font-size: 1.1rem; font-weight: 700; color: var(--accent); }
+  .history-time { font-size: 0.72rem; color: var(--muted); margin-top: 2px; }
+  .empty-history { text-align: center; color: var(--muted); padding: 3rem 1rem; }
+  @media(max-width:700px){ .calc-grid{grid-template-columns:1fr;} }
+</style>
+{% endblock %}
+{% block content %}
+<div class="page">
+  <div class="calc-header fade-up">
+    <h1>🧮 Калькулятор</h1>
+    <p>Вычисления с историей операций · поддержка процентов</p>
+  </div>
+
+  <div class="calc-grid">
+    <div class="calc-card fade-up d1">
+      <h2>Калькулятор</h2>
+      <div class="calc-display">
+        <div class="calc-expr" id="calcExpr"></div>
+        <div class="calc-result" id="calcResult">0</div>
+      </div>
+      <div class="calc-buttons">
+        <button class="calc-btn clear" onclick="calcClear()">C</button>
+        <button class="calc-btn clear" onclick="calcDel()">⌫</button>
+        <button class="calc-btn op"    onclick="calcInput('%')">%</button>
+        <button class="calc-btn op"    onclick="calcInput('/')">÷</button>
+
+        <button class="calc-btn" onclick="calcInput('7')">7</button>
+        <button class="calc-btn" onclick="calcInput('8')">8</button>
+        <button class="calc-btn" onclick="calcInput('9')">9</button>
+        <button class="calc-btn op" onclick="calcInput('*')">×</button>
+
+        <button class="calc-btn" onclick="calcInput('4')">4</button>
+        <button class="calc-btn" onclick="calcInput('5')">5</button>
+        <button class="calc-btn" onclick="calcInput('6')">6</button>
+        <button class="calc-btn op" onclick="calcInput('-')">−</button>
+
+        <button class="calc-btn" onclick="calcInput('1')">1</button>
+        <button class="calc-btn" onclick="calcInput('2')">2</button>
+        <button class="calc-btn" onclick="calcInput('3')">3</button>
+        <button class="calc-btn op" onclick="calcInput('+')">+</button>
+
+        <button class="calc-btn wide" onclick="calcInput('0')">0</button>
+        <button class="calc-btn"     onclick="calcInput('.')">.</button>
+        <button class="calc-btn eq"  onclick="calcEqual()">=</button>
+      </div>
+    </div>
+
+    <div class="calc-card fade-up d2">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.25rem;">
+        <h2 style="margin:0;">📋 История вычислений</h2>
+        <button onclick="clearHistory()" class="btn btn-ghost" style="padding:5px 12px;font-size:0.82rem;">Очистить</button>
+      </div>
+      <div class="history-wrap" id="historyWrap">
+        <div class="empty-history">🧮<br>История пуста<br><small>Начни вычисления</small></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+let expr = '';
+let history = [];
+try { history = JSON.parse(localStorage.getItem('calcHistory') || '[]'); } catch(e) { history = []; }
+
+function updateDisplay(resultText) {
+  document.getElementById('calcExpr').textContent = expr || '';
+  const resEl = document.getElementById('calcResult');
+  resEl.textContent = resultText !== undefined ? resultText : (expr || '0');
+  resEl.className = 'calc-result';
+}
+
+function calcInput(val) {
+  const ops = ['+', '-', '*', '/', '.'];
+  const last = expr.slice(-1);
+
+  // Не ставим два оператора подряд (кроме минуса после оператора)
+  if (ops.includes(val) && ops.includes(last)) {
+    expr = expr.slice(0, -1) + val;
+  }
+  // Не ставим % если уже есть %
+  else if (val === '%' && expr.includes('%')) {
+    return;
+  }
+  // Не ставим % в начале или после оператора без числа
+  else if (val === '%' && (expr === '' || ops.includes(last))) {
+    return;
+  }
+  else {
+    expr += val;
+  }
+  updateDisplay();
+}
+
+function calcClear() {
+  expr = '';
+  updateDisplay('0');
+}
+
+function calcDel() {
+  expr = expr.slice(0, -1);
+  updateDisplay();
+}
+
+/**
+ * Обработка процентов:
+ * 100 + 20%  → 100 + 20 (20% от 100) = 120
+ * 100 - 20%  → 100 - 20 (20% от 100) = 80
+ * 100 * 20%  → 100 * 0.20 = 20
+ * 100 / 20%  → 100 / 0.20 = 500
+ * 20%        → 0.20
+ */
+function resolvePercent(expression) {
+  // Формат: число [оператор число%]
+  const percentPattern = /^(\d+\.?\d*)([\+\-\*\/])(\d+\.?\d*)%$/;
+  const match = expression.match(percentPattern);
+
+  if (match) {
+    const a    = parseFloat(match[1]);
+    const op   = match[2];
+    const b    = parseFloat(match[3]);
+
+    if (op === '+' || op === '-') {
+      // 100+20% → процент от первого числа
+      const percentValue = a * b / 100;
+      return `${a}${op}${percentValue}`;
+    } else {
+      // 100*20% или 100/20% → просто делим b на 100
+      return `${a}${op}${b / 100}`;
+    }
+  }
+
+  // Просто число%  → число/100
+  const simplePercent = /^(\d+\.?\d*)%$/.test(expression);
+  if (simplePercent) {
+    return expression.replace(/^(\d+\.?\d*)%$/, (_, n) => `${parseFloat(n) / 100}`);
+  }
+
+  return expression;
+}
+
+function calcEqual() {
+  if (!expr) return;
+  try {
+    const resolved = resolvePercent(expr);
+    const safe = resolved.replace(/×/g, '*').replace(/÷/g, '/');
+
+    // Проверяем на безопасность — только цифры и операторы
+    if (!/^[\d\s\+\-\*\/\.\(\)]+$/.test(safe)) {
+      throw new Error('Недопустимые символы');
+    }
+
+    const result = Function('"use strict"; return (' + safe + ')')();
+
+    if (!isFinite(result)) throw new Error('Деление на ноль');
+
+    const rounded = parseFloat(result.toFixed(10)).toString();
+    const entry = {
+      expr: expr,
+      result: rounded,
+      time: new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })
+    };
+    history.unshift(entry);
+    if (history.length > 50) history.pop();
+    localStorage.setItem('calcHistory', JSON.stringify(history));
+
+    document.getElementById('calcExpr').textContent = expr + ' =';
+    const resEl = document.getElementById('calcResult');
+    resEl.textContent = rounded;
+    resEl.className = 'calc-result';
+    expr = rounded;
+    renderHistory();
+  } catch(e) {
+    const resEl = document.getElementById('calcResult');
+    resEl.textContent = e.message === 'Деление на ноль' ? '÷ 0' : 'Ошибка';
+    resEl.className = 'calc-result error';
+    expr = '';
+  }
+}
+
+function clearHistory() {
+  history = [];
+  localStorage.setItem('calcHistory', '[]');
+  renderHistory();
+}
+
+function renderHistory() {
+  const wrap = document.getElementById('historyWrap');
+  if (!history.length) {
+    wrap.innerHTML = '<div class="empty-history">🧮<br>История пуста<br><small>Начни вычисления</small></div>';
+    return;
+  }
+  wrap.innerHTML = history.map((h, i) => `
+    <div class="history-item" onclick="useFromHistory(${i})">
+      <div>
+        <div class="history-expr">${h.expr} =</div>
+        <div class="history-time">${h.time}</div>
+      </div>
+      <div class="history-res">${h.result}</div>
+    </div>`).join('');
+}
+
+function useFromHistory(i) {
+  expr = history[i].result;
+  document.getElementById('calcResult').textContent = expr;
+  document.getElementById('calcExpr').textContent = history[i].expr + ' =';
+}
+
+document.addEventListener('keydown', e => {
+  if (e.key >= '0' && e.key <= '9') calcInput(e.key);
+  else if (['+', '-', '*', '/', '%', '.'].includes(e.key)) calcInput(e.key);
+  else if (e.key === 'Enter' || e.key === '=') calcEqual();
+  else if (e.key === 'Backspace') calcDel();
+  else if (e.key === 'Escape') calcClear();
+});
+
+renderHistory();
+</script>
+{% endblock %}
