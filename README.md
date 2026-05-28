@@ -53,8 +53,8 @@
 
 ```bash
 # Клонировать репозиторий
-git clone https://github.com/chekuringleb-collab/currency-portal.git
-cd currency-portal
+git clone https://github.com/chekuringleb-collab/FX-PORTAL.git
+cd FX-PORTAL
 
 # Запустить
 docker-compose up --build
@@ -68,8 +68,8 @@ docker-compose up --build
 
 ```bash
 # Клонировать репозиторий
-git clone https://github.com/chekuringleb-collab/currency-portal.git
-cd currency-portal
+git clone https://github.com/chekuringleb-collab/FX-PORTAL.git
+cd FX-PORTAL
 
 # Создать виртуальное окружение
 python -m venv .venv
@@ -165,13 +165,19 @@ GBP;Британский фунт;🇬🇧;1.2651;2026-05-18
 ## 🗂️ Структура проекта
 
 ```
-currency-portal/
+FX-PORTAL/
 ├── app.py                    # Основное Flask-приложение
 ├── tests.py                  # Тесты (24 теста)
 ├── requirements.txt          # Зависимости Python
 ├── Dockerfile                # Docker-образ
 ├── docker-compose.yml        # Docker Compose
-├── .env.example              # Пример переменных окружения
+├── docs/                     # Проектная документация
+│   ├── agile.png             # Схема методологии разработки (Draw.IO)
+│   ├── architecture_description.docx  # Описание архитектуры системы
+│   ├── interface_prototypes.docx      # Прототипы интерфейсов
+│   ├── testing_results.docx           # Результаты тестирования
+│   ├── ai_usage.md           # Использование ИИ в проекте
+│   └── feedback.md           # Обратная связь после первой итерации
 └── templates/
     ├── base.html             # Базовый шаблон с navbar и переключателем темы
     ├── index.html            # Главная (курсы, конвертер, виджет дня, избранное)
@@ -241,7 +247,8 @@ Ran 24 tests in 25s — OK ✅
 
 ## 👥 Команда
 
-Учебный проект — 3 студента
+Учебный проект — 3 студента  
+Дисциплина: «Проектирование программных продуктов»
 
 ---
 
