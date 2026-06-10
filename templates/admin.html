@@ -1,5 +1,41 @@
 {% extends "base.html" %}
-{% block title %}Админ-панель — FX Portal{% endblock %}
+{% block title %}Админ-панель — FX Portal<script>
+async function testApi() {
+  const btn = document.getElementById('btnTest');
+  const box = document.getElementById('apiTestResult');
+  const source = document.querySelector('select[name="api_source"]').value;
+  const key = document.querySelector('input[name="api_key"]').value.trim();
+  btn.disabled = true;
+  btn.textContent = 'Проверяю...';
+  box.style.display = 'block';
+  box.style.background = 'rgba(90,101,133,0.15)';
+  box.style.color = 'var(--muted)';
+  box.textContent = 'Отправляю запрос...';
+  try {
+    const params = new URLSearchParams({ source, key });
+    const r = await fetch('/admin/api-test?' + params);
+    const d = await r.json();
+    if (d.ok) {
+      box.style.background = 'rgba(52,211,153,0.1)';
+      box.style.color = 'var(--green)';
+      box.innerHTML = `✓ Успешно &nbsp;·&nbsp; ${d.elapsed_ms} мс &nbsp;·&nbsp; источник: <b>${d.source}</b><br>
+URL: ${d.url}<br>
+Примеры курсов: ${Object.entries(d.sample_rates).map(([k,v])=>`${k}: ${v}`).join(' &nbsp; ')}`;
+    } else {
+      box.style.background = 'rgba(248,113,113,0.1)';
+      box.style.color = 'var(--red)';
+      box.innerHTML = `✗ Ошибка ${d.status || ''} &nbsp;·&nbsp; источник: <b>${d.source}</b><br>${d.error || ''}`;
+    }
+  } catch(e) {
+    box.style.background = 'rgba(248,113,113,0.1)';
+    box.style.color = 'var(--red)';
+    box.textContent = '✗ Не удалось выполнить запрос: ' + e.message;
+  }
+  btn.disabled = false;
+  btn.textContent = 'Проверить';
+}
+</script>
+{% endblock %}
 {% block head %}
 <style>
   .admin-header { margin-bottom: 1.5rem; }
@@ -34,6 +70,18 @@
   .log-time { color: var(--muted); font-size: 0.78rem; white-space: nowrap; }
   .log-ip { color: var(--muted); font-size: 0.75rem; font-family: monospace; }
   @media(max-width:700px){ .admin-stats{grid-template-columns:repeat(2,1fr);} }
+  /* API Settings */
+  .settings-wrap { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; margin-bottom: 1.5rem; }
+  .settings-wrap-header { display: flex; align-items: center; justify-content: space-between; padding: 1.1rem 1.3rem; border-bottom: 1px solid var(--border); }
+  .settings-wrap-header h2 { font-family: var(--font-head); font-size: 1rem; font-weight: 700; }
+  .settings-body { padding: 1.3rem; }
+  .settings-row { display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap; }
+  .settings-field { display: flex; flex-direction: column; gap: 6px; flex: 1; min-width: 180px; }
+  .settings-field label { font-size: 0.78rem; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.4px; }
+  .settings-field select, .settings-field input { background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; padding: 8px 12px; color: var(--text); font-size: 0.875rem; font-family: var(--font-body); }
+  .settings-field input::placeholder { color: var(--muted); }
+  .settings-hint { font-size: 0.78rem; color: var(--muted); margin-top: 10px; }
+  .settings-hint a { color: var(--accent); }
 </style>
 {% endblock %}
 {% block content %}
@@ -62,8 +110,45 @@
     </div>
   </div>
 
+  <!-- Настройки API -->
+  <div class="settings-wrap fade-up d2">
+    <div class="settings-wrap-header">
+      <h2>🔑 Настройки API курсов</h2>
+      <span style="font-size:0.82rem;color:var(--muted)">Источник данных о курсах валют</span>
+    </div>
+    <div class="settings-body">
+      <form method="POST" action="{{ url_for('admin_save_settings') }}">
+        <div class="settings-row">
+          <div class="settings-field">
+            <label>Источник данных</label>
+            <select name="api_source">
+              <option value="exchangerate" {% if api_source == 'exchangerate' %}selected{% endif %}>ExchangeRate-API (v6, нужен ключ)</option>
+              <option value="openexchange" {% if api_source == 'openexchange' %}selected{% endif %}>Open Exchange Rates (нужен ключ)</option>
+              <option value="frankfurter"  {% if api_source == 'frankfurter'  %}selected{% endif %}>Frankfurter / ЕЦБ (бесплатно, без ключа)</option>
+            </select>
+          </div>
+          <div class="settings-field">
+            <label>API ключ</label>
+            <input type="text" name="api_key" value="{{ api_key }}" placeholder="Вставьте ключ сюда...">
+          </div>
+          <button type="submit" class="btn btn-primary" style="padding:8px 20px;white-space:nowrap;">Сохранить</button>
+          <button type="button" id="btnTest" class="btn btn-ghost" style="padding:8px 16px;white-space:nowrap;" onclick="testApi()">Проверить</button>
+        </div>
+        <div id="apiTestResult" style="display:none;margin-top:12px;padding:12px 14px;border-radius:8px;font-size:0.83rem;font-family:monospace;"></div>
+        <p class="settings-hint">
+          Получить ключ:
+          <a href="https://www.exchangerate-api.com/" target="_blank">ExchangeRate-API</a> &nbsp;·&nbsp;
+          <a href="https://openexchangerates.org/signup/free" target="_blank">Open Exchange Rates</a> &nbsp;·&nbsp;
+          Frankfurter работает без ключа (данные ЕЦБ, только основные валюты).
+          &nbsp;
+          {% if api_key %}<span style="color:var(--green)">✓ Ключ установлен</span>{% else %}<span style="color:var(--muted)">Ключ не задан — используется бесплатный лимит</span>{% endif %}
+        </p>
+      </form>
+    </div>
+  </div>
+
   <!-- Пользователи -->
-  <div class="users-wrap fade-up d2">
+  <div class="users-wrap fade-up d3">
     <div class="users-wrap-header">
       <h2>👥 Пользователи</h2>
       <span style="font-size:0.82rem;color:var(--muted)">{{ users|length }} записей</span>
@@ -122,12 +207,11 @@
   </div>
 
   <!-- Логи -->
-  <div class="logs-wrap fade-up d3">
+  <div class="logs-wrap fade-up d4">
     <div class="logs-wrap-header">
       <h2>📋 Последние действия</h2>
       <a href="{{ url_for('admin_logs') }}" class="btn btn-ghost" style="padding:5px 12px;font-size:0.82rem;">Все логи →</a>
     </div>
-    {% set recent = namespace(logs=[]) %}
     {% for u in users %}
       {% for log in u.logs[-3:] %}
         <div class="log-item">

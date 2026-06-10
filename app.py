@@ -81,7 +81,8 @@ class User(UserMixin, db.Model):
     role        = db.Column(db.String(20), default='user', nullable=False)
     is_blocked  = db.Column(db.Boolean, default=False, nullable=False)
     theme       = db.Column(db.String(10), default='dark', nullable=False)
-    favorites   = db.Column(db.String(200), default='', nullable=False)
+    favorites      = db.Column(db.String(200), default='', nullable=False)
+    base_currency  = db.Column(db.String(10), default='USD', nullable=False)
     created_at  = db.Column(db.DateTime, default=datetime.datetime.utcnow)
     last_login  = db.Column(db.DateTime, nullable=True)
     login_count = db.Column(db.Integer, default=0, nullable=False)
@@ -262,6 +263,14 @@ def profile():
                 db.session.commit()
                 flash('Тема изменена!', 'success')
 
+        elif action == 'change_base_currency':
+            base = request.form.get('base_currency', 'USD').upper()
+            if base in RU_NAMES:
+                current_user.base_currency = base
+                db.session.commit()
+                log_action(current_user.id, f"Сменил базовую валюту на {base}")
+                flash(f'Базовая валюта изменена на {base}.', 'success')
+
         return redirect(url_for('profile'))
 
     logs = ActionLog.query.filter_by(user_id=current_user.id).order_by(ActionLog.created_at.desc()).limit(10).all()
@@ -353,6 +362,11 @@ def admin_logs():
     return render_template('admin_logs.html', logs=logs, search=search)
 
 # ── API ───────────────────────────────────────────────────────────────────────
+@app.route('/api/base-currency')
+@login_required
+def api_base_currency():
+    return jsonify({"base": current_user.base_currency or 'USD'})
+
 @app.route('/api/rates')
 @login_required
 def get_rates():

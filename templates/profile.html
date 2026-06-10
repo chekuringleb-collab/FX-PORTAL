@@ -20,6 +20,8 @@
   .log-item:last-child { border-bottom: none; }
   .log-action { color: var(--text); flex: 1; }
   .log-time   { color: var(--muted); white-space: nowrap; }
+  .base-select { background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; padding: 10px 14px; color: var(--text); font-size: 0.9rem; font-family: var(--font-body); width: 100%; margin-bottom: 1rem; }
+  .base-select:focus { outline: none; border-color: var(--accent); }
   @media(max-width:700px){ .profile-grid{grid-template-columns:1fr;} }
 </style>
 {% endblock %}
@@ -55,6 +57,9 @@
       <div class="info-row"><span class="info-label">Избранных валют</span>
         <span class="info-value">{{ user.favorites_list | length }}</span>
       </div>
+      <div class="info-row"><span class="info-label">Базовая валюта</span>
+        <span class="info-value" style="color:var(--accent)">{{ user.base_currency or 'USD' }}</span>
+      </div>
     </div>
 
     <!-- Тема -->
@@ -76,8 +81,25 @@
       </form>
     </div>
 
-    <!-- Смена пароля -->
+    <!-- Базовая валюта -->
     <div class="section-card fade-up d3">
+      <h2>💱 Базовая валюта</h2>
+      <p style="font-size:0.85rem;color:var(--muted);margin-bottom:1rem;">Все курсы будут пересчитаны относительно выбранной валюты</p>
+      <form method="POST" action="{{ url_for('profile') }}">
+        <input type="hidden" name="action" value="change_base_currency">
+        <select name="base_currency" class="base-select">
+          {% for code, name in ru_names.items() %}
+          <option value="{{ code }}" {% if (user.base_currency or 'USD') == code %}selected{% endif %}>
+            {{ code }} — {{ name }}
+          </option>
+          {% endfor %}
+        </select>
+        <button type="submit" class="btn btn-primary" style="justify-content:center;width:100%;">Сохранить</button>
+      </form>
+    </div>
+
+    <!-- Смена пароля -->
+    <div class="section-card fade-up d4">
       <h2>🔒 Смена пароля</h2>
       <form method="POST" action="{{ url_for('profile') }}" style="display:flex;flex-direction:column;gap:1rem;">
         <input type="hidden" name="action" value="change_password">
@@ -98,7 +120,7 @@
     </div>
 
     <!-- Последние действия -->
-    <div class="section-card fade-up d4">
+    <div class="section-card fade-up d5" style="grid-column: 1 / -1;">
       <h2>📋 Последние действия</h2>
       {% if logs %}
         {% for log in logs %}

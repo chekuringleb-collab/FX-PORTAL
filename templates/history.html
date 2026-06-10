@@ -23,6 +23,7 @@
   }
   .period-btn:hover { color:var(--text); }
   .period-btn.active { background:var(--accent);color:#fff;border-color:var(--accent); }
+  .period-divider { width:1px;background:var(--border);margin:0 2px;align-self:stretch; }
   .source-badge { font-size:0.75rem;padding:3px 9px;border-radius:5px;font-weight:500; }
   .source-real { background:rgba(52,211,153,0.12);color:var(--green); }
   .source-sim  { background:rgba(90,101,133,0.2); color:var(--muted); }
@@ -57,6 +58,9 @@
         <button class="period-btn" data-period="3m">3 мес</button>
         <button class="period-btn" data-period="6m">6 мес</button>
         <button class="period-btn" data-period="1y">1 год</button>
+        <div class="period-divider"></div>
+        <button class="period-btn" data-period="prev_week">Пр. неделя</button>
+        <button class="period-btn" data-period="prev_month">Пр. месяц</button>
       </div>
     </div>
     <div style="position:relative;height:320px;" id="chartWrap">
@@ -74,7 +78,25 @@ async function loadHistory(period) {
   const wrap = document.getElementById('chartWrap');
   wrap.innerHTML = '<div class="spinner"></div>';
   try {
-    const r = await fetch(`/api/history/${CODE}?period=${period}`);
+    let url;
+    if (period === 'prev_week') {
+      const today = new Date();
+      const dow = today.getDay() === 0 ? 7 : today.getDay();
+      const lastMon = new Date(today); lastMon.setDate(today.getDate() - dow - 6);
+      const lastSun = new Date(today); lastSun.setDate(today.getDate() - dow);
+      const fmt = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+      url = `/api/history/${CODE}?from=${fmt(lastMon)}&to=${fmt(lastSun)}`;
+    } else if (period === 'prev_month') {
+      const today = new Date();
+      const y = today.getFullYear(), m = today.getMonth();
+      const firstDay = new Date(y, m - 1, 1);
+      const lastDay  = new Date(y, m, 0);
+      const fmt = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+      url = `/api/history/${CODE}?from=${fmt(firstDay)}&to=${fmt(lastDay)}`;
+    } else {
+      url = `/api/history/${CODE}?period=${period}`;
+    }
+    const r = await fetch(url);
     const data = await r.json();
     if (data.error) throw new Error(data.error);
 

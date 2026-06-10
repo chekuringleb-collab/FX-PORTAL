@@ -87,10 +87,10 @@
   </div>
 
   <div class="stats-row fade-up d1" id="statsRow">
-    <div class="stat-card"><div class="stat-label">Базовая валюта</div><div class="stat-value">USD</div><div class="stat-sub">US Dollar</div></div>
+    <div class="stat-card"><div class="stat-label">Базовая валюта</div><div class="stat-value" id="baseCurrencyLabel">USD</div><div class="stat-sub" id="baseCurrencyName">US Dollar</div></div>
     <div class="stat-card"><div class="stat-label">Загружено пар</div><div class="stat-value" id="pairsCount">—</div><div class="stat-sub">валютных пар</div></div>
     <div class="stat-card"><div class="stat-label">Обновлено</div><div class="stat-value" id="updatedDate" style="font-size:1rem;margin-top:4px;">—</div><div class="stat-sub">дата котировки</div></div>
-    <div class="stat-card"><div class="stat-label">EUR/USD</div><div class="stat-value" id="eurRate">—</div><div class="stat-sub">евро за доллар</div></div>
+    <div class="stat-card"><div class="stat-label" id="eurRateLabel">EUR/USD</div><div class="stat-value" id="eurRate">—</div><div class="stat-sub">евро за доллар</div></div>
   </div>
 
   <!-- Виджет курса дня -->
@@ -111,7 +111,7 @@
   <div class="main-grid">
     <div class="rates-wrap fade-up d2">
       <div class="rates-header">
-        <h2>Все курсы к USD</h2>
+        <h2 id="ratesTableTitle">Все курсы к USD</h2>
         <input class="search-input" type="text" id="searchInput" placeholder="Поиск валюты..." />
       </div>
       <div id="tableContainer">
@@ -162,9 +162,27 @@
 </div>
 
 <script>
-let ratesData = [];
+let ratesData = [];       // сырые курсы к USD от API
+let baseCurrency = 'USD'; // базовая валюта пользователя
 let favorites = new Set({{ favorites | tojson }});
 let miniChartInstance = null;
+
+// Пересчитать курс валюты относительно базовой
+function toBase(rateToUsd) {
+  if (baseCurrency === 'USD') return rateToUsd;
+  const baseRate = ratesData.find(r => r.code === baseCurrency)?.rate || 1;
+  return rateToUsd / baseRate;
+}
+
+async function init() {
+  // Загружаем базовую валюту пользователя
+  try {
+    const r = await fetch('/api/base-currency');
+    const d = await r.json();
+    baseCurrency = d.base || 'USD';
+  } catch(e) {}
+  await loadRates();
+}
 
 async function loadRates() {
   try {
@@ -186,21 +204,35 @@ async function loadRates() {
 function updateStats(data) {
   document.getElementById('pairsCount').textContent = data.rates.length;
   document.getElementById('updatedDate').textContent = data.date || '—';
+  document.getElementById('baseCurrencyLabel').textContent = baseCurrency;
+  const baseInfo = ratesData.find(r => r.code === baseCurrency);
+  document.getElementById('baseCurrencyName').textContent = baseInfo ? baseInfo.name : (baseCurrency === 'USD' ? 'US Dollar' : baseCurrency);
+
+  // EUR к базовой
   const eur = data.rates.find(r => r.code === 'EUR');
-  if (eur) document.getElementById('eurRate').textContent = eur.rate.toFixed(4);
+  if (eur) {
+    const converted = toBase(eur.rate);
+    document.getElementById('eurRate').textContent = converted.toFixed(4);
+    document.getElementById('eurRateLabel').textContent = baseCurrency === 'USD' ? 'EUR/USD' : `EUR/${baseCurrency}`;
+  }
+  // Заголовок таблицы
+  document.getElementById('ratesTableTitle').textContent = `Все курсы к ${baseCurrency}`;
 }
 
 function renderTable(rates) {
   if (!rates.length) { document.getElementById('tableContainer').innerHTML = '<div style="padding:2rem;text-align:center;color:var(--muted)">Нет данных</div>'; return; }
-  let html = `<table class="rates-table"><thead><tr><th>Валюта</th><th>Курс к USD</th><th>График</th><th>★</th></tr></thead><tbody>`;
-  rates.forEach(r => {
+  // Исключаем базовую валюту из таблицы
+  const filtered = rates.filter(r => r.code !== baseCurrency);
+  let html = `<table class="rates-table"><thead><tr><th>Валюта</th><th>Курс к ${baseCurrency}</th><th>График</th><th>★</th></tr></thead><tbody>`;
+  filtered.forEach(r => {
     const isFav = favorites.has(r.code);
+    const displayRate = toBase(r.rate).toFixed(4);
     html += `<tr>
       <td><div class="currency-cell">
         <span class="currency-flag">${r.flag}</span>
         <div><div class="currency-code">${r.code}</div><div class="currency-name">${r.name}</div></div>
       </div></td>
-      <td><span class="rate-value">${r.rate.toFixed(4)}</span></td>
+      <td><span class="rate-value">${displayRate}</span></td>
       <td><a class="history-link" href="/history/${r.code}">Тренд →</a></td>
       <td>
         <button onclick="toggleFav('${r.code}')" id="fav-${r.code}"
@@ -215,7 +247,10 @@ function renderTable(rates) {
 
 function populateSelects(rates) {
   const TOP = ['USD','EUR','RUB','CNY','GBP','JPY','KZT','TRY','CHF','CAD','AED','AUD','BYN'];
-  const sorted = [...rates].sort((a,b) => {
+  const allRates = baseCurrency === 'USD'
+    ? rates
+    : [{ code: 'USD', name: 'Доллар США', flag: '🇺🇸', rate: 1 }, ...rates.filter(r => r.code !== 'USD')];
+  const sorted = [...allRates].sort((a,b) => {
     const ai = TOP.indexOf(a.code), bi = TOP.indexOf(b.code);
     if (ai !== -1 && bi !== -1) return ai - bi;
     if (ai !== -1) return -1; if (bi !== -1) return 1;
@@ -225,14 +260,14 @@ function populateSelects(rates) {
     const sel = document.getElementById(id);
     sel.innerHTML = sorted.map(r => `<option value="${r.code}">${r.flag} ${r.code} — ${r.name}</option>`).join('');
   });
-  document.getElementById('convFrom').value = 'USD';
-  document.getElementById('convTo').value   = 'RUB';
+  document.getElementById('convFrom').value = baseCurrency;
+  document.getElementById('convTo').value   = baseCurrency === 'RUB' ? 'USD' : 'RUB';
 }
 
 function renderTopCurrencies(rates) {
   const TOP = ['EUR','RUB','CNY','GBP','JPY','KZT'];
   const el = document.getElementById('topCurrencies');
-  const filtered = TOP.map(c => rates.find(r => r.code === c)).filter(Boolean);
+  const filtered = TOP.filter(c => c !== baseCurrency).map(c => rates.find(r => r.code === c)).filter(Boolean);
   el.innerHTML = filtered.map(r => `
     <div style="display:flex;align-items:center;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--border);">
       <div style="display:flex;align-items:center;gap:8px;">
@@ -242,7 +277,7 @@ function renderTopCurrencies(rates) {
           <div style="font-size:0.72rem;color:var(--muted)">${r.name}</div>
         </div>
       </div>
-      <div style="font-family:var(--font-head);font-weight:700;font-size:0.93rem">${r.rate.toFixed(4)}</div>
+      <div style="font-family:var(--font-head);font-weight:700;font-size:0.93rem">${toBase(r.rate).toFixed(4)}</div>
     </div>`).join('');
 }
 
@@ -251,8 +286,10 @@ function convert() {
   const from   = document.getElementById('convFrom').value;
   const to     = document.getElementById('convTo').value;
   if (!ratesData.length) return;
-  const fromRate = from === 'USD' ? 1 : ratesData.find(r => r.code === from)?.rate || 1;
-  const toRate   = to   === 'USD' ? 1 : ratesData.find(r => r.code === to)?.rate   || 1;
+  // Все конвертации через USD как промежуточную
+  const getUsdRate = code => code === 'USD' ? 1 : (ratesData.find(r => r.code === code)?.rate || 1);
+  const fromRate = getUsdRate(from);
+  const toRate   = getUsdRate(to);
   const result   = amount * (toRate / fromRate);
   document.getElementById('convResultAmount').textContent = result.toFixed(4);
   document.getElementById('convResultLabel').textContent  = `${amount} ${from} → ${to}`;
@@ -330,7 +367,7 @@ async function loadMovers() {
           <span style="font-weight:600;font-size:0.85rem;">${m.code}</span>
         </div>
         <div style="text-align:right;">
-          <div style="font-size:0.85rem;font-weight:600;">${m.rate.toFixed(4)}</div>
+          <div style="font-size:0.85rem;font-weight:600;">${toBase(m.rate).toFixed(4)}</div>
           <div style="font-size:0.75rem;color:${color};">${m.change > 0 ? '+' : ''}${m.change}%</div>
         </div>
       </div>`;
@@ -339,7 +376,7 @@ async function loadMovers() {
   } catch(e) {}
 }
 
-loadRates();
+init();
 loadMovers();
 setInterval(loadRates, 60000);
 setInterval(loadMovers, 300000);

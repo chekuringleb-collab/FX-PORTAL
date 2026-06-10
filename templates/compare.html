@@ -6,7 +6,6 @@
   .compare-header { margin-bottom: 1.5rem; }
   .compare-header h1 { font-family: var(--font-head); font-size: 1.8rem; font-weight: 800; margin-bottom: 4px; }
   .compare-header p  { color: var(--muted); font-size: 0.88rem; }
-
   .currency-selector {
     background: var(--surface); border: 1px solid var(--border);
     border-radius: var(--radius); padding: 1.25rem; margin-bottom: 1.5rem;
@@ -21,8 +20,7 @@
   }
   .pill:hover { color: var(--text); border-color: var(--accent); }
   .pill.active { background: var(--accent); color: #fff; border-color: var(--accent); }
-
-  .period-row { display: flex; align-items: center; gap: 8px; margin-top: 1rem; }
+  .period-row { display: flex; align-items: center; gap: 8px; margin-top: 1rem; flex-wrap: wrap; }
   .period-row span { font-size: 0.82rem; color: var(--muted); }
   .period-btn {
     padding: 4px 12px; border-radius: 7px; border: 1px solid var(--border);
@@ -31,7 +29,7 @@
   }
   .period-btn:hover { color: var(--text); }
   .period-btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
-
+  .period-divider { width: 1px; background: var(--border); margin: 0 2px; align-self: stretch; }
   .charts-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
@@ -39,8 +37,7 @@
   }
   .chart-card {
     background: var(--surface); border: 1px solid var(--border);
-    border-radius: var(--radius); padding: 1.25rem;
-    transition: border-color 0.2s;
+    border-radius: var(--radius); padding: 1.25rem; transition: border-color 0.2s;
   }
   .chart-card:hover { border-color: rgba(79,142,247,0.4); }
   .chart-card-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; }
@@ -51,13 +48,8 @@
   .chart-rate { font-family: var(--font-head); font-size: 1rem; font-weight: 700; }
   .chart-change { font-size: 0.78rem; margin-top: 2px; font-weight: 500; }
   .source-dot { width: 7px; height: 7px; border-radius: 50%; display: inline-block; margin-right: 4px; }
-
-  .empty-state {
-    grid-column: 1/-1; text-align: center; padding: 4rem 2rem;
-    color: var(--muted); font-size: 0.9rem;
-  }
+  .empty-state { grid-column: 1/-1; text-align: center; padding: 4rem 2rem; color: var(--muted); font-size: 0.9rem; }
   .empty-state .icon { font-size: 3rem; margin-bottom: 1rem; }
-
   @media (max-width: 640px) { .charts-grid { grid-template-columns: 1fr; } }
 </style>
 {% endblock %}
@@ -80,6 +72,9 @@
       <button class="period-btn" data-period="3m">3 мес</button>
       <button class="period-btn" data-period="6m">6 мес</button>
       <button class="period-btn" data-period="1y">1 год</button>
+      <div class="period-divider"></div>
+      <button class="period-btn" data-period="prev_week">Пр. неделя</button>
+      <button class="period-btn" data-period="prev_month">Пр. месяц</button>
     </div>
   </div>
 
@@ -97,9 +92,50 @@ const COLORS = [
   '#38bdf8','#fb923c','#e879f9','#4ade80','#f472b6'
 ];
 let ratesData = [];
-let selectedCodes = new Set(['EUR','GBP','JPY']);
+let baseCurrency = 'USD';
+let selectedCodes = new Set();
 let currentPeriod = '1m';
 let chartInstances = {};
+
+function fmtDate(d) {
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+
+function buildUrl(code) {
+  if (currentPeriod === 'prev_week') {
+    const today = new Date();
+    const dow = today.getDay() === 0 ? 7 : today.getDay();
+    const lastMon = new Date(today); lastMon.setDate(today.getDate() - dow - 6);
+    const lastSun = new Date(today); lastSun.setDate(today.getDate() - dow);
+    return `/api/history/${code}?from=${fmtDate(lastMon)}&to=${fmtDate(lastSun)}`;
+  } else if (currentPeriod === 'prev_month') {
+    const today = new Date();
+    const y = today.getFullYear(), m = today.getMonth();
+    const firstDay = new Date(y, m - 1, 1);
+    const lastDay  = new Date(y, m, 0);
+    return `/api/history/${code}?from=${fmtDate(firstDay)}&to=${fmtDate(lastDay)}`;
+  }
+  return `/api/history/${code}?period=${currentPeriod}`;
+}
+
+function toBase(rateToUsd) {
+  if (baseCurrency === 'USD') return rateToUsd;
+  const baseRate = ratesData.find(r => r.code === baseCurrency)?.rate || 1;
+  return rateToUsd / baseRate;
+}
+
+async function init() {
+  try {
+    const r = await fetch('/api/base-currency');
+    const d = await r.json();
+    baseCurrency = d.base || 'USD';
+  } catch(e) {}
+  // Выбираем по умолчанию валюты кроме базовой
+  const defaults = ['EUR','GBP','JPY'].filter(c => c !== baseCurrency);
+  if (defaults.length < 3 || baseCurrency !== 'USD') defaults.push(baseCurrency === 'USD' ? 'CNY' : 'USD');
+  defaults.slice(0,3).forEach(c => selectedCodes.add(c));
+  await loadRates();
+}
 
 async function loadRates() {
   const r = await fetch('/api/rates');
@@ -120,11 +156,8 @@ function renderPills() {
 }
 
 function toggleCurrency(code) {
-  if (selectedCodes.has(code)) {
-    selectedCodes.delete(code);
-  } else {
-    selectedCodes.add(code);
-  }
+  if (selectedCodes.has(code)) selectedCodes.delete(code);
+  else selectedCodes.add(code);
   renderPills();
   renderCharts();
 }
@@ -137,10 +170,7 @@ async function renderCharts() {
     grid.innerHTML = `<div class="empty-state"><div class="icon">📈</div><div>Выбери валюты выше чтобы увидеть графики</div></div>`;
     return;
   }
-
   const codes = [...selectedCodes];
-
-  // Убираем карточки которые больше не нужны
   Object.keys(chartInstances).forEach(code => {
     if (!selectedCodes.has(code)) {
       chartInstances[code].destroy();
@@ -149,20 +179,16 @@ async function renderCharts() {
       if (el) el.remove();
     }
   });
-
-  // Убираем empty state если есть
   const empty = grid.querySelector('.empty-state');
   if (empty) empty.remove();
 
-  // Добавляем новые карточки
   for (let i = 0; i < codes.length; i++) {
     const code = codes[i];
     if (document.getElementById(`card-${code}`)) continue;
-
     const rate = ratesData.find(r => r.code === code);
     if (!rate) continue;
-
     const color = COLORS[i % COLORS.length];
+    const displayRate = toBase(rate.rate).toFixed(4);
     const card = document.createElement('div');
     card.className = 'chart-card fade-up';
     card.id = `card-${code}`;
@@ -176,7 +202,7 @@ async function renderCharts() {
           </div>
         </div>
         <div style="text-align:right;">
-          <div class="chart-rate" style="color:${color}">${rate.rate.toFixed(4)}</div>
+          <div class="chart-rate" style="color:${color}">${displayRate} <span style="font-size:0.7rem;color:var(--muted)">${baseCurrency}</span></div>
           <div class="chart-change" id="change-${code}">—</div>
         </div>
       </div>
@@ -191,10 +217,9 @@ async function renderCharts() {
 
 async function loadChart(code, color) {
   try {
-    const r = await fetch(`/api/history/${code}?period=${currentPeriod}`);
+    const r = await fetch(buildUrl(code));
     const data = await r.json();
     if (data.error) return;
-
     const rates = data.rates;
     const change = rates[rates.length-1] - rates[0];
     const changePct = ((change / rates[0]) * 100).toFixed(2);
@@ -203,12 +228,10 @@ async function loadChart(code, color) {
       changeEl.textContent = `${change >= 0 ? '▲' : '▼'} ${Math.abs(changePct)}%`;
       changeEl.style.color = change >= 0 ? 'var(--green)' : 'var(--red)';
     }
-
     const sourceEl = document.getElementById(`source-${code}`);
     if (sourceEl) {
       sourceEl.innerHTML = `<span class="source-dot" style="background:${data.real ? 'var(--green)' : 'var(--muted)'}"></span>${data.real ? 'Реальные данные (ЕЦБ)' : 'Симуляция'}`;
     }
-
     if (chartInstances[code]) chartInstances[code].destroy();
     const canvas = document.getElementById(`canvas-${code}`);
     if (!canvas) return;
@@ -220,7 +243,6 @@ async function loadChart(code, color) {
     const b2 = parseInt(rgb.substring(4,6),16);
     grad.addColorStop(0, `rgba(${r2},${g2},${b2},0.2)`);
     grad.addColorStop(1, `rgba(${r2},${g2},${b2},0)`);
-
     chartInstances[code] = new Chart(ctx, {
       type: 'line',
       data: {
@@ -258,10 +280,7 @@ async function reloadAllCharts() {
   for (let i = 0; i < codes.length; i++) {
     const code = codes[i];
     const color = COLORS[i % COLORS.length];
-    if (chartInstances[code]) {
-      chartInstances[code].destroy();
-      delete chartInstances[code];
-    }
+    if (chartInstances[code]) { chartInstances[code].destroy(); delete chartInstances[code]; }
     await loadChart(code, color);
   }
 }
@@ -275,6 +294,6 @@ document.querySelectorAll('.period-btn').forEach(btn => {
   });
 });
 
-loadRates();
+init();
 </script>
 {% endblock %}
